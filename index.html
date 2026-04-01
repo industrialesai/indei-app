@@ -217,7 +217,7 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:1px}
             <div style="font-size:13px;font-weight:500">Dueño</div>
             <div style="font-size:11px;opacity:.7;margin-top:2px">Creo mi empresa</div>
           </button>
-          <button type="button" id="rol-vendedor" class="rol-btn" onclick="selectRol('vendedor')">
+          <button type="button" id="rol-vendedor" class="rol-btn" onclick="selectRol('vendedor');loadOrgsParaVendedor()">
             <div style="font-size:18px;margin-bottom:4px">🤝</div>
             <div style="font-size:13px;font-weight:500">Vendedor</div>
             <div style="font-size:11px;opacity:.7;margin-top:2px">Me uno a un equipo</div>
@@ -233,7 +233,7 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:1px}
         <select id="s-org" style="width:100%;padding:8px 10px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg3);color:var(--text)">
           <option value="">Cargando empresas...</option>
         </select>
-        <div style="font-size:11px;color:var(--text2);margin-top:4px">Solo aparecen empresas registradas en la plataforma.</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px"><span style="font-size:11px;color:var(--text2)">Solo aparecen empresas registradas en la plataforma.</span><button type="button" onclick="loadOrgsParaVendedor()" style="font-size:11px;color:var(--gold);background:none;border:none;cursor:pointer;padding:0">↻ Actualizar</button></div>
       </div>
       <button class="auth-btn" onclick="signup()">Crear cuenta</button>
     </div>
@@ -315,7 +315,7 @@ function authTab(t){
   document.querySelectorAll('.auth-tab').forEach((x,i)=>x.classList.toggle('active',i===(t==='login'?0:1)));
   document.getElementById('pane-login').style.display=t==='login'?'block':'none';
   document.getElementById('pane-signup').style.display=t==='signup'?'block':'none';
-  if(t==='signup')loadOrgsParaVendedor();
+  if(t==='signup'){rolSeleccionado='dueno';selectRol('dueno');}
   msg('');
 }
 
@@ -449,18 +449,34 @@ async function setupNuevaCuenta(){
   const rol=meta.rol||'dueno';
   if(rol==='dueno'){
     const empNombre=meta.empresa_nombre||'Mi Empresa';
-    // Create org
-    const{data:org,error:orgErr}=await db.from('organizaciones').insert({nombre:empNombre,owner_id:ME.id}).select().single();
-    if(orgErr){console.error(orgErr);load(false);return;}
-    ORG=org;MI_ROL='dueno';MI_NOMBRE=nombre;
-    // Create membership
-    await db.from('miembros').insert({org_id:org.id,user_id:ME.id,rol:'dueno',nombre});
+    // Check if org already exists (in case of double call)
+    const{data:existing}=await db.from('miembros').select('org_id,organizaciones(*)').eq('user_id',ME.id).maybeSingle();
+    if(existing){
+      ORG=existing.organizaciones;MI_ROL='dueno';MI_NOMBRE=nombre;
+    } else {
+      const{data:org,error:orgErr}=await db.from('organizaciones').insert({nombre:empNombre,owner_id:ME.id}).select().single();
+      if(orgErr){
+        alert('Error creando organización: '+orgErr.message);
+        load(false);return;
+      }
+      ORG=org;MI_ROL='dueno';MI_NOMBRE=nombre;
+      const{error:memErr}=await db.from('miembros').insert({org_id:org.id,user_id:ME.id,rol:'dueno',nombre});
+      if(memErr){alert('Error creando membresía: '+memErr.message);load(false);return;}
+    }
   } else {
     const orgId=meta.org_id;
-    if(!orgId){load(false);return;}
-    const{data:org}=await db.from('organizaciones').select('*').eq('id',orgId).single();
-    ORG=org;MI_ROL='vendedor';MI_NOMBRE=nombre;
-    await db.from('miembros').insert({org_id:orgId,user_id:ME.id,rol:'vendedor',nombre});
+    if(!orgId){alert('No se encontró la empresa. Contacta al administrador.');load(false);return;}
+    // Check if already a member
+    const{data:existing}=await db.from('miembros').select('org_id,organizaciones(*)').eq('user_id',ME.id).maybeSingle();
+    if(existing){
+      ORG=existing.organizaciones;MI_ROL='vendedor';MI_NOMBRE=nombre;
+    } else {
+      const{data:org}=await db.from('organizaciones').select('*').eq('id',orgId).single();
+      if(!org){alert('Empresa no encontrada.');load(false);return;}
+      ORG=org;MI_ROL='vendedor';MI_NOMBRE=nombre;
+      const{error:memErr}=await db.from('miembros').insert({org_id:orgId,user_id:ME.id,rol:'vendedor',nombre});
+      if(memErr){alert('Error uniéndote al equipo: '+memErr.message);load(false);return;}
+    }
   }
   MIEMBROS=[];D.emp=[];D.usu=[];D.act=[];D.sb={};
   document.getElementById('tu').textContent=`${MI_NOMBRE} · ${MI_ROL==='dueno'?'Dueño':'Vendedor'}`;
