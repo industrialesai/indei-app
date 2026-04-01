@@ -184,6 +184,10 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:1px}
   table{font-size:11px}
   thead th,tbody td{padding:5px 6px}
 }
+
+.rol-btn{width:100%;padding:12px 8px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg3);color:var(--text);cursor:pointer;text-align:center;transition:border-color .15s,background .15s}
+.rol-btn:hover{border-color:var(--gold-dark);background:var(--gold-bg2)}
+.rol-btn.active{border:1.5px solid var(--gold);background:var(--gold-bg);color:var(--gold-light)}
 </style>
 </head>
 <body>
@@ -204,7 +208,33 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:1px}
     <div id="pane-signup" style="display:none">
       <div class="auth-field"><label>Nombre completo</label><input type="text" id="s-name" placeholder="Tu nombre"></div>
       <div class="auth-field"><label>Correo</label><input type="email" id="s-email" placeholder="tu@correo.com"></div>
-      <div class="auth-field"><label>Contraseña</label><input type="password" id="s-pass" placeholder="Mínimo 6 caracteres" onkeydown="if(event.key==='Enter')signup()"></div>
+      <div class="auth-field"><label>Contraseña</label><input type="password" id="s-pass" placeholder="Mínimo 6 caracteres"></div>
+      <div class="auth-field">
+        <label>¿Cuál es tu rol?</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">
+          <button type="button" id="rol-dueno" class="rol-btn active" onclick="selectRol('dueno')">
+            <div style="font-size:18px;margin-bottom:4px">🏢</div>
+            <div style="font-size:13px;font-weight:500">Dueño</div>
+            <div style="font-size:11px;opacity:.7;margin-top:2px">Creo mi empresa</div>
+          </button>
+          <button type="button" id="rol-vendedor" class="rol-btn" onclick="selectRol('vendedor')">
+            <div style="font-size:18px;margin-bottom:4px">🤝</div>
+            <div style="font-size:13px;font-weight:500">Vendedor</div>
+            <div style="font-size:11px;opacity:.7;margin-top:2px">Me uno a un equipo</div>
+          </button>
+        </div>
+      </div>
+      <div id="campo-empresa-nueva" class="auth-field">
+        <label>Nombre de tu empresa</label>
+        <input type="text" id="s-empresa" placeholder="Ej: Soluciones Industriales SA">
+      </div>
+      <div id="campo-org-select" class="auth-field" style="display:none">
+        <label>Selecciona tu empresa</label>
+        <select id="s-org" style="width:100%;padding:8px 10px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg3);color:var(--text)">
+          <option value="">Cargando empresas...</option>
+        </select>
+        <div style="font-size:11px;color:var(--text2);margin-top:4px">Solo aparecen empresas registradas en la plataforma.</div>
+      </div>
       <button class="auth-btn" onclick="signup()">Crear cuenta</button>
     </div>
     <div id="auth-msg" class="auth-msg"></div>
@@ -245,8 +275,15 @@ const SB_URL='https://bfsiambllgmxmsgicvar.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJmc2lhbWJsbGdteG1zZ2ljdmFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMDc2NTcsImV4cCI6MjA5MDU4MzY1N30.MfUmM2tChjHTvcz4EJ5UP02D5cQUTGY_LDRw_ZnPB0M';
 const db=supabase.createClient(SB_URL,SB_KEY);
 let ME=null;
+let ORG=null;   // {id, nombre, owner_id}
+let MI_ROL=null; // 'dueno' | 'vendedor'
+let MI_NOMBRE='';
+let MIEMBROS=[]; // todos los miembros de la org
 const D={emp:[],usu:[],act:[],sb:{}};
 let sbOff=0;
+let filtroVendedor='todos'; // uid o 'todos'
+let sbFiltroUid=null; // null = yo mismo
+let rolSeleccionado='dueno';
 
 // helpers
 const fmt=n=>{if(!n&&n!==0)return'—';if(Math.abs(n)>=1e6)return'$'+(n/1e6).toFixed(1)+'M';if(Math.abs(n)>=1000)return'$'+Math.round(n/1000).toLocaleString()+'K';return'$'+Math.round(n).toLocaleString()};
@@ -278,23 +315,65 @@ function authTab(t){
   document.querySelectorAll('.auth-tab').forEach((x,i)=>x.classList.toggle('active',i===(t==='login'?0:1)));
   document.getElementById('pane-login').style.display=t==='login'?'block':'none';
   document.getElementById('pane-signup').style.display=t==='signup'?'block':'none';
+  if(t==='signup')loadOrgsParaVendedor();
   msg('');
 }
+
+function selectRol(r){
+  rolSeleccionado=r;
+  document.getElementById('rol-dueno').classList.toggle('active',r==='dueno');
+  document.getElementById('rol-vendedor').classList.toggle('active',r==='vendedor');
+  document.getElementById('campo-empresa-nueva').style.display=r==='dueno'?'block':'none';
+  document.getElementById('campo-org-select').style.display=r==='vendedor'?'block':'none';
+}
+
+async function loadOrgsParaVendedor(){
+  const{data}=await db.from('organizaciones').select('id,nombre').order('nombre');
+  const sel=document.getElementById('s-org');
+  if(!data||!data.length){sel.innerHTML='<option value="">No hay empresas registradas aún</option>';return;}
+  sel.innerHTML='<option value="">— Selecciona tu empresa —</option>'+data.map(o=>`<option value="${o.id}">${o.nombre}</option>`).join('');
+}
+
 async function login(){
   const e=document.getElementById('l-email').value.trim(),p=document.getElementById('l-pass').value;
   if(!e||!p)return msg('Completa todos los campos');
   load(true);const{error}=await db.auth.signInWithPassword({email:e,password:p});load(false);
   if(error)msg(error.message==='Invalid login credentials'?'Correo o contraseña incorrectos':error.message);
 }
+
 async function signup(){
-  const n=document.getElementById('s-name').value.trim(),e=document.getElementById('s-email').value.trim(),p=document.getElementById('s-pass').value;
-  if(!n||!e||!p)return msg('Completa todos los campos');
-  if(p.length<6)return msg('La contraseña debe tener al menos 6 caracteres');
-  load(true);const{error}=await db.auth.signUp({email:e,password:p,options:{data:{full_name:n}}});load(false);
-  if(error)msg(error.message);
-  else msg('Cuenta creada. Revisa tu correo para confirmar.',true);
+  const nombre=document.getElementById('s-name').value.trim();
+  const email=document.getElementById('s-email').value.trim();
+  const pass=document.getElementById('s-pass').value;
+  if(!nombre||!email||!pass)return msg('Completa todos los campos');
+  if(pass.length<6)return msg('La contraseña debe tener al menos 6 caracteres');
+  if(rolSeleccionado==='dueno'){
+    const empNombre=document.getElementById('s-empresa').value.trim();
+    if(!empNombre)return msg('Escribe el nombre de tu empresa');
+    load(true);
+    const{data:authData,error}=await db.auth.signUp({email,password:pass,options:{data:{full_name:nombre,rol:'dueno',empresa_nombre:empNombre}}});
+    load(false);
+    if(error)return msg(error.message);
+    // Create org + miembro via edge function or directly after email confirm
+    // Store pending data in user metadata — org gets created on first login
+    msg('Cuenta creada. Revisa tu correo para confirmar tu cuenta.',true);
+  } else {
+    const orgId=document.getElementById('s-org').value;
+    if(!orgId)return msg('Selecciona tu empresa');
+    load(true);
+    const{data:authData,error}=await db.auth.signUp({email,password:pass,options:{data:{full_name:nombre,rol:'vendedor',org_id:orgId}}});
+    load(false);
+    if(error)return msg(error.message);
+    msg('Cuenta creada. Revisa tu correo para confirmar tu cuenta.',true);
+  }
 }
-async function signout(){await db.auth.signOut();ME=null;document.getElementById('app-screen').style.display='none';document.getElementById('auth-screen').style.display='flex';}
+
+async function signout(){
+  await db.auth.signOut();
+  ME=null;ORG=null;MI_ROL=null;MIEMBROS=[];
+  document.getElementById('app-screen').style.display='none';
+  document.getElementById('auth-screen').style.display='flex';
+}
 
 // On page load: check session immediately
 (async()=>{
@@ -334,15 +413,57 @@ db.auth.onAuthStateChange(async(event,session)=>{
 
 async function loadAll(){
   load(true);
-  const[{data:e},{data:u},{data:a},{data:s}]=await Promise.all([
-    db.from('empresas').select('*').order('created_at'),
-    db.from('usuarios').select('*').order('created_at'),
-    db.from('actividades').select('*').order('fecha',{ascending:false}),
-    db.from('scoreboard').select('*'),
+  // 1. Get my membership + org
+  const{data:mem}=await db.from('miembros').select('*,organizaciones(*)').eq('user_id',ME.id).single();
+  if(!mem){
+    // First login — need to create org if dueño
+    await setupNuevaCuenta();
+    load(false);return;
+  }
+  ORG=mem.organizaciones;
+  MI_ROL=mem.rol;
+  MI_NOMBRE=mem.nombre;
+  // 2. Load all org data in parallel
+  const[{data:mems},{data:e},{data:u},{data:a},{data:s}]=await Promise.all([
+    db.from('miembros').select('*').eq('org_id',ORG.id),
+    db.from('empresas').select('*').eq('org_id',ORG.id).order('created_at'),
+    db.from('usuarios').select('*').eq('org_id',ORG.id).order('created_at'),
+    db.from('actividades').select('*').eq('org_id',ORG.id).order('fecha',{ascending:false}),
+    db.from('scoreboard').select('*').eq('org_id',ORG.id),
   ]);
+  MIEMBROS=mems||[];
   D.emp=e||[];D.usu=u||[];D.act=a||[];D.sb={};
-  (s||[]).forEach(r=>{D.sb[r.week_key]=r;});
+  (s||[]).forEach(r=>{
+    const k=r.week_key+'_'+r.user_id;
+    D.sb[k]=r;
+  });
+  // Update topbar
+  const rolLabel=MI_ROL==='dueno'?'Dueño':'Vendedor';
+  document.getElementById('tu').textContent=`${MI_NOMBRE} · ${rolLabel}`;
   load(false);
+}
+
+async function setupNuevaCuenta(){
+  const meta=ME.user_metadata||{};
+  const nombre=meta.full_name||ME.email;
+  const rol=meta.rol||'dueno';
+  if(rol==='dueno'){
+    const empNombre=meta.empresa_nombre||'Mi Empresa';
+    // Create org
+    const{data:org,error:orgErr}=await db.from('organizaciones').insert({nombre:empNombre,owner_id:ME.id}).select().single();
+    if(orgErr){console.error(orgErr);load(false);return;}
+    ORG=org;MI_ROL='dueno';MI_NOMBRE=nombre;
+    // Create membership
+    await db.from('miembros').insert({org_id:org.id,user_id:ME.id,rol:'dueno',nombre});
+  } else {
+    const orgId=meta.org_id;
+    if(!orgId){load(false);return;}
+    const{data:org}=await db.from('organizaciones').select('*').eq('id',orgId).single();
+    ORG=org;MI_ROL='vendedor';MI_NOMBRE=nombre;
+    await db.from('miembros').insert({org_id:orgId,user_id:ME.id,rol:'vendedor',nombre});
+  }
+  MIEMBROS=[];D.emp=[];D.usu=[];D.act=[];D.sb={};
+  document.getElementById('tu').textContent=`${MI_NOMBRE} · ${MI_ROL==='dueno'?'Dueño':'Vendedor'}`;
 }
 
 function usDeEmp(eid){return D.usu.filter(u=>u.empresa_id===eid);}
@@ -355,16 +476,18 @@ function calcEmp(eid){
   return{fT,sC,sP,pdp,dsm:pdp-fT,pep:pdp>0?fT/pdp:0};
 }
 
-function autoWeek(wk){
+function autoWeek(wk,uid){
   const d=new Date(wk+'T12:00:00');const f=new Date(d);f.setDate(d.getDate()+4);
   const fs=f.toISOString().split('T')[0];
   const inR=dt=>dt&&dt>=wk&&dt<=fs;
+  // If uid provided, filter to that user; otherwise current user only (for scoreboard)
+  const acts=uid?D.act.filter(a=>a.registrado_por===uid):D.act.filter(a=>a.registrado_por===ME.id);
   return{
-    contactos:D.act.filter(a=>inR(a.fecha)&&['contactado','intento'].includes(a.estado)).length,
-    citas:D.act.filter(a=>inR(a.fecha)&&a.estado==='cita_agendada').length,
-    visitas:D.act.filter(a=>{const u=a.fecha_prog||a.fecha;return inR(u)&&a.estado==='visita_realizada';}).length,
-    cotizaciones:D.act.filter(a=>inR(a.fecha)&&a.estado==='cotizacion').length,
-    ordenes:D.act.filter(a=>inR(a.fecha)&&a.estado==='orden').length,
+    contactos:acts.filter(a=>inR(a.fecha)&&['contactado','intento'].includes(a.estado)).length,
+    citas:acts.filter(a=>inR(a.fecha)&&a.estado==='cita_agendada').length,
+    visitas:acts.filter(a=>{const u=a.fecha_prog||a.fecha;return inR(u)&&a.estado==='visita_realizada';}).length,
+    cotizaciones:acts.filter(a=>inR(a.fecha)&&a.estado==='cotizacion').length,
+    ordenes:acts.filter(a=>inR(a.fecha)&&a.estado==='orden').length,
   };
 }
 
@@ -443,7 +566,7 @@ function showEF(){
 }
 async function saveEmp(){
   const n=document.getElementById('ef-n')?.value.trim();if(!n)return alert('Escribe el nombre');
-  load(true);const{data,error}=await db.from('empresas').insert({nombre:n,user_id:ME.id}).select().single();load(false);
+  load(true);const{data,error}=await db.from('empresas').insert({nombre:n,org_id:ORG.id}).select().single();load(false);
   if(error)return alert(error.message);
   D.emp.push(data);document.getElementById('ef-container').innerHTML='';rMapa();
 }
@@ -533,7 +656,7 @@ async function saveU(eid){
   const pct_planta=pct_planta_pct/100;
   load(true);
   const{data,error}=await db.from('usuarios').insert({
-    empresa_id:eid,user_id:ME.id,nombre,
+    empresa_id:eid,org_id:ORG.id,nombre,
     area:document.getElementById(`ua-${eid}`)?.value.trim()||'',
     rcu:document.getElementById(`ur-${eid}`)?.value||'AMARILLO',
     fact,pct_rep,pct_planta
@@ -562,7 +685,9 @@ function rAct(){
   const pOpts=D.emp.map(e=>`<option value="${e.id}">${e.nombre}</option>`).join('');
   const fD=document.getElementById('fd')?.value||'',fH=document.getElementById('fh')?.value||'';
   let filt=[...D.act];
-  if(fD)filt=filt.filter(a=>a.fecha>=fD);if(fH)filt=filt.filter(a=>a.fecha<=fH);
+  if(fD)filt=filt.filter(a=>a.fecha>=fD);
+  if(fH)filt=filt.filter(a=>a.fecha<=fH);
+  if(filtroVendedor!=='todos')filt=filt.filter(a=>a.registrado_por===filtroVendedor);
   const total=filt.length,citas=filt.filter(a=>['cita_agendada','visita_realizada'].includes(a.estado)).length,cots=filt.filter(a=>a.estado==='cotizacion').length,ocs=filt.filter(a=>a.estado==='orden').length;
   const rL=(fD||fH)?`${fD?fd(fD):'inicio'} — ${fH?fd(fH):'hoy'}`:'Todas las fechas';
   const grp={};filt.forEach(a=>{const k=a.fecha||'Sin fecha';if(!grp[k])grp[k]=[];grp[k].push(a);});
@@ -576,7 +701,10 @@ function rAct(){
         <div class="act-icon" style="background:${e.bg}">${e.icon}</div>
         <div style="flex:1">
           <div style="font-size:13px;font-weight:500">${a.usuario_nombre} <span style="font-weight:400;color:var(--text2)">— ${a.empresa_nombre}</span></div>
-          <div style="margin-top:3px"><span class="badge ${e.badge}">${e.label}</span></div>
+          <div style="margin-top:3px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <span class="badge ${e.badge}">${e.label}</span>
+            ${a.registrado_nombre?`<span style="font-size:11px;color:var(--text3)">por ${a.registrado_nombre}</span>`:''}
+          </div>
           ${a.fecha_prog?`<div class="act-prog">📌 Programado para ${fd(a.fecha_prog)}</div>`:''}
           ${a.notas?`<div style="font-size:12px;color:var(--text2);margin-top:4px">${a.notas}</div>`:''}
         </div>
@@ -584,6 +712,14 @@ function rAct(){
       </div>`;
     });
   });
+  const vendedorOpts=MI_ROL==='dueno'?`
+    <div style="margin-bottom:12px">
+      <label style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;display:block">Filtrar por vendedor</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-sm ${filtroVendedor==='todos'?'btn-primary':''}" onclick="filtroVendedor='todos';rAct()">Todos</button>
+        ${MIEMBROS.map(m=>`<button class="btn btn-sm ${filtroVendedor===m.user_id?'btn-primary':''}" onclick="filtroVendedor='${m.user_id}';rAct()">${m.nombre}${m.rol==='dueno'?' (Dueño)':''}</button>`).join('')}
+      </div>
+    </div>`:'';
   el.innerHTML=`
   <div class="metrics">
     <div class="metric"><div class="metric-label">Actividades</div><div class="metric-value">${total}</div><div class="metric-sub">${rL}</div></div>
@@ -591,6 +727,7 @@ function rAct(){
     <div class="metric"><div class="metric-label">Cotizaciones</div><div class="metric-value" style="color:var(--amber)">${cots}</div></div>
     <div class="metric"><div class="metric-label">Órdenes de compra</div><div class="metric-value" style="color:var(--green)">${ocs}</div></div>
   </div>
+  ${vendedorOpts}
   <div class="card" style="margin-bottom:1rem">
     <div style="font-size:13px;font-weight:500;margin-bottom:12px">Registrar actividad</div>
     <div class="grid g3">
@@ -633,7 +770,10 @@ async function saveAct(){
   const emp=D.emp.find(e=>e.id===eid),usu=D.usu.find(u=>u.id===uid);
   load(true);
   const{data,error}=await db.from('actividades').insert({
-    user_id:ME.id,empresa_id:eid,usuario_id:uid,
+    org_id:ORG.id,
+    registrado_por:ME.id,
+    registrado_nombre:MI_NOMBRE,
+    empresa_id:eid,usuario_id:uid,
     empresa_nombre:emp.nombre,usuario_nombre:usu.nombre,
     estado:document.getElementById('aet')?.value,
     fecha:document.getElementById('af')?.value||today(),
@@ -662,17 +802,19 @@ const MM=[
   {key:'power_knockouts',label:'Power knockouts',icon:'⚡',sub:'gerentes / supervisores nuevos'},
   {key:'facturacion',label:'Facturación',icon:'💰',sub:'monto facturado ($)',isMoney:true},
 ];
-function sbG(k,f){const r=D.sb[wKey()];if(!r)return'';return r[`${k}_${f}`]||'';}
+function sbKey2(uid){return wKey()+'_'+(uid||ME.id);}
+function sbG(k,f,uid){const r=D.sb[sbKey2(uid||sbFiltroUid)];if(!r)return'';return r[`${k}_${f}`]||'';}
 async function sbS(k,f,v){
-  const wk=wKey();const ex=D.sb[wk];const pl={[`${k}_${f}`]:parseFloat(v)||0};
-  if(ex){await db.from('scoreboard').update(pl).eq('id',ex.id);D.sb[wk]={...ex,...pl};}
-  else{const{data}=await db.from('scoreboard').insert({user_id:ME.id,week_key:wk,...pl}).select().single();if(data)D.sb[wk]=data;}
+  const wk=wKey();const sk=sbKey2(sbFiltroUid);const ex=D.sb[sk];const pl={[`${k}_${f}`]:parseFloat(v)||0};
+  if(ex){await db.from('scoreboard').update(pl).eq('id',ex.id);D.sb[sk]={...ex,...pl};}
+  else{const{data}=await db.from('scoreboard').insert({org_id:ORG.id,user_id:ME.id,week_key:wk,...pl}).select().single();if(data)D.sb[sk]=data;}
   rSBSum();
 }
 
 function rSB(){
   const el=document.getElementById('page-scoreboard');
-  const k=wKey(),isNow=sbOff===0,auto=autoWeek(k);
+  if(!sbFiltroUid)sbFiltroUid=ME.id;
+  const k=wKey(),isNow=sbOff===0,auto=autoWeek(k,sbFiltroUid);
   const card=(m,isA)=>{
     const meta=parseFloat(sbG(m.key,'meta'))||0;
     const real=isA?auto[m.key]:(parseFloat(sbG(m.key,'real'))||0);
@@ -699,10 +841,11 @@ function rSB(){
       <div style="font-size:11px;color:var(--text2);margin-top:6px">${m.sub}</div>
     </div>`;
   };
-  const pastK=Object.keys(D.sb).filter(x=>x<k).sort().reverse().slice(0,5);
+  const myUid=sbFiltroUid||ME.id;
+  const pastK=[...new Set(Object.keys(D.sb).filter(x=>x.endsWith('_'+myUid)&&x.replace('_'+myUid,'')<k).map(x=>x.replace('_'+myUid,'')))].sort().reverse().slice(0,5);
   const hist=pastK.length===0?`<div class="empty" style="padding:1rem">Sin semanas anteriores.</div>`:
     pastK.map(wk=>{
-      const aH=autoWeek(wk);const row=D.sb[wk]||{};
+      const aH=autoWeek(wk,sbFiltroUid||ME.id);const wkSk=wk+'_'+(sbFiltroUid||ME.id);const row=D.sb[wkSk]||{};
       const rows=[...AM,...MM].map(m=>{
         const iA=AM.find(x=>x.key===m.key);
         const meta=parseFloat(row[`${m.key}_meta`])||0;
@@ -713,7 +856,15 @@ function rSB(){
       }).filter(Boolean).join('');
       return`<div class="hw"><div class="hw-hdr" onclick="this.nextElementSibling.classList.toggle('open')"><span>${wLabel(wk)}</span><span style="font-size:11px;color:var(--text2)">ver ↓</span></div><div class="hw-body">${rows||'Sin datos.'}</div></div>`;
     }).join('');
+  const sbVendedorOpts=MI_ROL==='dueno'?`
+    <div style="margin-bottom:1rem">
+      <div class="section-label" style="margin-bottom:6px">Ver scoreboard de</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${MIEMBROS.map(m=>`<button class="btn btn-sm ${sbFiltroUid===(m.user_id)?' btn-primary':''}" onclick="sbFiltroUid='${m.user_id}';rSB()">${m.nombre}${m.rol==='dueno'?' (Dueño)':''}</button>`).join('')}
+      </div>
+    </div>`:'';
   el.innerHTML=`
+  ${sbVendedorOpts}
   <div class="sb-header">
     <div><div style="font-size:15px;font-weight:500">Moneymaker Scoreboard</div><div style="font-size:12px;color:var(--text2);margin-top:2px">Lo que no se mide, no se controla</div></div>
     <div class="sb-wnav">
@@ -733,7 +884,7 @@ function rSB(){
 }
 function rSBSum(){
   const el=document.getElementById('sbsum');if(!el)return;
-  const k=wKey(),auto=autoWeek(k);
+  const k=wKey(),auto=autoWeek(k,sbFiltroUid||ME.id);
   const rows=[...AM,...MM].map(m=>{
     const iA=AM.find(x=>x.key===m.key);
     const meta=parseFloat(sbG(m.key,'meta'))||0;
