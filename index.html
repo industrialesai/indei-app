@@ -378,14 +378,14 @@ async function signup(){
     const{error}=await db.auth.signUp({email,password:pass,options:{data:{full_name:nombre,rol:'dueno',empresa_nombre:empNombre}}});
     load(false);
     if(error)return msg(error.message);
-    msg('Cuenta creada. Revisa tu correo para confirmar.',true);
+    msg('¡Cuenta creada! Ya puedes iniciar sesión.',true);
   } else {
     // Vendedor: se registra sin org, la selecciona al entrar
     load(true);
     const{error}=await db.auth.signUp({email,password:pass,options:{data:{full_name:nombre,rol:'vendedor'}}});
     load(false);
     if(error)return msg(error.message);
-    msg('Cuenta creada. Revisa tu correo para confirmar.',true);
+    msg('¡Cuenta creada! Ya puedes iniciar sesión.',true);
   }
 }
 
@@ -427,21 +427,31 @@ async function iniciarApp(user){
 }
 
 // Arranque
+let _appStarted=false;
 db.auth.onAuthStateChange(async(event,session)=>{
   if(event==='INITIAL_SESSION'){
     if(session?.user){
+      _appStarted=true;
       await iniciarApp(session.user);
     } else {
       goToLogin();
     }
   }
   if(event==='SIGNED_IN'){
-    if(!ME) await iniciarApp(session.user);
+    if(!ME&&!_appStarted){_appStarted=true;await iniciarApp(session.user);}
   }
   if(event==='SIGNED_OUT'){
-    goToLogin();
+    _appStarted=false;goToLogin();
   }
 });
+// Safety: clear loading overlay after 10s no matter what
+setTimeout(()=>{
+  if(document.getElementById('overlay')?.style.display!=='none'){
+    console.warn('Force-clearing stuck overlay');
+    load(false);
+    if(!ME) goToLogin();
+  }
+},10000);
 
 async function loadAll(){
   load(true);
@@ -455,20 +465,27 @@ async function loadAll(){
   if(!mem){
     const rol=ME.user_metadata?.rol||'dueno';
     if(rol==='dueno'){
+      // Create org automatically from signup metadata
       await setupNuevaCuenta();
-      load(false);
-      // Re-run loadAll now that org exists
-      await loadAll();return;
+      // Re-fetch membership
+      const{data:mem2}=await db.from('miembros').select('*,organizaciones(*)').eq('user_id',ME.id).maybeSingle();
+      if(!mem2){
+        // Still no membership - show manual screen as fallback
+        load(false);
+        mostrarPantallaEmpresaDueno(ME.user_metadata?.full_name||ME.email);
+        return;
+      }
+      ORG=mem2.organizaciones;MI_ROL=mem2.rol;MI_NOMBRE=mem2.nombre;
     } else {
-      // Vendedor sin org — mostrar pantalla de selección
       load(false);
       await mostrarPantallaOrg();
       return;
     }
-  }
+  } else {
   ORG=mem.organizaciones;
   MI_ROL=mem.rol;
   MI_NOMBRE=mem.nombre;
+  }
   // 2. Load all org data in parallel
   const[{data:mems},{data:e},{data:u},{data:a},{data:s}]=await Promise.all([
     db.from('miembros').select('*').eq('org_id',ORG.id),
@@ -525,14 +542,26 @@ async function setupNuevaCuenta(){
   const nombre=meta.full_name||ME.email;
   const rol=meta.rol||'dueno';
   if(rol==='dueno'){
-    // Show a screen to enter company name (safer than relying on metadata)
-    load(false);
-    mostrarPantallaEmpresaDueno(nombre);
-    return;
+    const empNombre=meta.empresa_nombre||nombre+' - Empresa';
+    // Create org directly, no screen needed
+    const{data:org,error:orgErr}=await db.from('organizaciones').insert({nombre:empNombre,owner_id:ME.id}).select().single();
+    if(orgErr){
+      console.error('Error org:',orgErr);
+      load(false);
+      mostrarPantallaEmpresaDueno(nombre);
+      return;
+    }
+    const{error:memErr}=await db.from('miembros').insert({org_id:org.id,user_id:ME.id,rol:'dueno',nombre});
+    if(memErr){
+      console.error('Error miembro:',memErr);
+      load(false);
+      mostrarPantallaEmpresaDueno(nombre);
+      return;
+    }
+    // Done - loadAll will re-run and find the membership now
   } else {
     load(false);
     await mostrarPantallaOrg();
-    return;
   }
 }
 
