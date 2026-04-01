@@ -192,7 +192,7 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:1px}
 </head>
 <body>
 
-<div id="auth-screen" style="display:flex">
+<div id="auth-screen" style="display:flex;min-height:100vh;align-items:center;justify-content:center;padding:1rem">
   <div class="auth-card">
     <div class="auth-logo">industriales.ai</div>
     <div class="auth-sub">Plataforma de Mapa del Éxito y Money Maker System</div>
@@ -277,6 +277,9 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:1px}
     <div id="page-actividades" class="page"></div>
     <div id="page-scoreboard" class="page"></div>
     <div id="page-ranking" class="page"></div>
+  </div>
+  <div style="text-align:center;padding:1.5rem 0 1rem;font-size:11px;color:var(--text3);letter-spacing:.04em">
+    industriales.ai · v1.0
   </div>
 </div>
 
@@ -396,14 +399,16 @@ function goToLogin(){
   const timeout=setTimeout(()=>{
     console.warn('Session timeout — forcing login');
     goToLogin();
-  },8000);
+  },5000);
   try{
     const{data:{session},error}=await db.auth.getSession();
     clearTimeout(timeout);
     if(error){goToLogin();return;}
     if(session?.user){
       ME=session.user;
+      // Show app immediately, load data in background
       document.getElementById('auth-screen').style.display='none';
+      document.getElementById('app-screen').style.display='block';
       try{
         await loadAll();
         go('mapa');
