@@ -668,10 +668,13 @@ function rMapa(){
 function showEF(){
   const c=document.getElementById('ef-container');
   if(c.innerHTML){c.innerHTML='';return;}
-  c.innerHTML=`<div class="form-block" style="margin-top:10px;margin-bottom:1rem">
-    <div style="font-size:13px;font-weight:500;margin-bottom:12px">Nueva empresa</div>
-    <div style="max-width:320px"><label>Nombre de la empresa</label><input id="ef-n" placeholder="Ej: JABIL"></div>
-    <div class="flex-end"><button class="btn" onclick="document.getElementById('ef-container').innerHTML=''">Cancelar</button><button class="btn btn-primary" onclick="saveEmp()">Agregar</button></div>
+  c.innerHTML=`<div style="background:var(--bg2);border:1px solid var(--gold-dark);border-radius:var(--radius-lg);padding:1.25rem 1.5rem;margin-top:10px;margin-bottom:1rem">
+    <div style="font-size:14px;font-weight:500;color:var(--gold);margin-bottom:14px">Nueva empresa</div>
+    <div style="max-width:320px;margin-bottom:14px"><label>Nombre de la empresa</label><input id="ef-n" placeholder="Ej: JABIL" style="margin-top:4px"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px">
+      <button class="btn" onclick="document.getElementById('ef-container').innerHTML=''">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveEmp()">Agregar empresa</button>
+    </div>
   </div>`;
   document.getElementById('ef-n').focus();
 }
@@ -689,8 +692,8 @@ async function delEmp(id){
 }
 function showUF(eid){
   const el=document.getElementById(`uform-${eid}`);if(el.innerHTML){el.innerHTML='';return;}
-  el.innerHTML=`<div class="form-block" style="margin-bottom:10px">
-    <div style="font-size:13px;font-weight:500;margin-bottom:12px">Nuevo usuario</div>
+  el.innerHTML=`<div style="background:var(--bg2);border:1px solid var(--gold-dark);border-radius:var(--radius-lg);padding:1.25rem 1.5rem;margin-bottom:10px">
+    <div style="font-size:14px;font-weight:500;color:var(--gold);margin-bottom:14px">Nuevo usuario</div>
     <div class="grid g4">
       <div><label>Nombre</label><input id="un-${eid}" placeholder="Ej: Enrique Flores"></div>
       <div><label>Área / Depto</label><input id="ua-${eid}" placeholder="Ej: Sistemas"></div>
