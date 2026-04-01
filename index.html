@@ -386,60 +386,46 @@ async function signout(){
 
 function goToLogin(){
   ME=null;ORG=null;MI_ROL=null;MIEMBROS=[];
-  document.getElementById('app-screen').style.display='none';
-  document.getElementById('auth-screen').style.display='flex';
-  document.getElementById('org-screen').style.display='none';
-  const ss=document.getElementById('setup-screen');if(ss)ss.style.display='none';
   load(false);
+  document.getElementById('app-screen').style.display='none';
+  document.getElementById('org-screen').style.display='none';
+  const ss=document.getElementById('setup-screen');if(ss)ss.remove();
+  const auth=document.getElementById('auth-screen');
+  auth.style.display='flex';
+  auth.style.minHeight='100vh';
+  auth.style.alignItems='center';
+  auth.style.justifyContent='center';
+  auth.style.padding='1rem';
+  auth.style.background='var(--bg3)';
 }
 
-// On page load: check session immediately
-(async()=>{
+async function iniciarApp(user){
+  ME=user;
   load(true);
-  const timeout=setTimeout(()=>{
-    console.warn('Session timeout — forcing login');
-    goToLogin();
-  },5000);
   try{
-    const{data:{session},error}=await db.auth.getSession();
-    clearTimeout(timeout);
-    if(error){goToLogin();return;}
+    await loadAll();
+    document.getElementById('auth-screen').style.display='none';
+    document.getElementById('app-screen').style.display='block';
+    load(false);
+    go('mapa');
+  }catch(e){
+    console.error('Error iniciando app:',e);
+    await db.auth.signOut();
+    goToLogin();
+  }
+}
+
+// Arranque
+db.auth.onAuthStateChange(async(event,session)=>{
+  if(event==='INITIAL_SESSION'){
     if(session?.user){
-      ME=session.user;
-      // Show app immediately, load data in background
-      document.getElementById('auth-screen').style.display='none';
-      document.getElementById('app-screen').style.display='block';
-      try{
-        await loadAll();
-        go('mapa');
-      } catch(e){
-        console.error('loadAll failed:',e);
-        goToLogin();
-      }
+      await iniciarApp(session.user);
     } else {
       goToLogin();
     }
-  } catch(e){
-    clearTimeout(timeout);
-    console.error('Session check failed:',e);
-    goToLogin();
   }
-})();
-
-// Handle auth events after page load
-db.auth.onAuthStateChange(async(event,session)=>{
-  if(event==='SIGNED_IN'&&session?.user&&!ME){
-    // Fresh login from the login form
-    ME=session.user;
-    document.getElementById('auth-screen').style.display='none';
-    load(true);
-    try{
-      await loadAll();
-      go('mapa');
-    } catch(e){
-      console.error('loadAll error:',e);
-      goToLogin();
-    }
+  if(event==='SIGNED_IN'){
+    if(!ME) await iniciarApp(session.user);
   }
   if(event==='SIGNED_OUT'){
     goToLogin();
