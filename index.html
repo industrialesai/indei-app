@@ -217,7 +217,7 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:1px}
             <div style="font-size:13px;font-weight:500">Dueño</div>
             <div style="font-size:11px;opacity:.7;margin-top:2px">Creo mi empresa</div>
           </button>
-          <button type="button" id="rol-vendedor" class="rol-btn" onclick="selectRol('vendedor');loadOrgsParaVendedor()">
+          <button type="button" id="rol-vendedor" class="rol-btn" onclick="selectRol('vendedor')">
             <div style="font-size:18px;margin-bottom:4px">🤝</div>
             <div style="font-size:13px;font-weight:500">Vendedor</div>
             <div style="font-size:11px;opacity:.7;margin-top:2px">Me uno a un equipo</div>
@@ -228,13 +228,6 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:1px}
         <label>Nombre de tu empresa</label>
         <input type="text" id="s-empresa" placeholder="Ej: Soluciones Industriales SA">
       </div>
-      <div id="campo-org-select" class="auth-field" style="display:none">
-        <label>Selecciona tu empresa</label>
-        <select id="s-org" style="width:100%;padding:8px 10px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg3);color:var(--text)">
-          <option value="">Cargando empresas...</option>
-        </select>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px"><span style="font-size:11px;color:var(--text2)">Solo aparecen empresas registradas en la plataforma.</span><button type="button" onclick="loadOrgsParaVendedor()" style="font-size:11px;color:var(--gold);background:none;border:none;cursor:pointer;padding:0">↻ Actualizar</button></div>
-      </div>
       <button class="auth-btn" onclick="signup()">Crear cuenta</button>
     </div>
     <div id="auth-msg" class="auth-msg"></div>
@@ -242,6 +235,23 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:1px}
 </div>
 
 <div class="overlay" id="overlay" style="display:none"><div class="spinner"></div><span>Cargando...</span></div>
+
+<!-- PANTALLA: vendedor selecciona su organización -->
+<div id="org-screen" style="display:none;min-height:100vh;background:var(--bg3);display:none;align-items:center;justify-content:center;padding:1rem">
+  <div style="background:var(--bg2);border:0.5px solid var(--border2);border-radius:var(--radius-lg);padding:2rem;width:100%;max-width:400px">
+    <div style="font-size:17px;font-weight:700;color:var(--gold);margin-bottom:4px">industriales.ai</div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:1.5rem">Selecciona la empresa a la que perteneces</div>
+    <div style="margin-bottom:1rem">
+      <label style="display:block;font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Empresa</label>
+      <select id="org-select" style="width:100%;padding:8px 10px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg3);color:var(--text)">
+        <option value="">Cargando...</option>
+      </select>
+    </div>
+    <button onclick="confirmarOrg()" style="width:100%;padding:9px;font-size:13px;font-weight:500;background:var(--gold);color:#111;border:none;border-radius:var(--radius);cursor:pointer">Unirme a esta empresa</button>
+    <div id="org-msg" style="font-size:12px;color:var(--red);margin-top:10px;text-align:center;min-height:16px"></div>
+    <button onclick="signout()" style="width:100%;margin-top:10px;padding:7px;font-size:12px;background:transparent;border:0.5px solid var(--border2);border-radius:var(--radius);cursor:pointer;color:var(--text2)">Cerrar sesión</button>
+  </div>
+</div>
 
 <div id="app-screen">
   <div class="header-shell">
@@ -351,20 +361,17 @@ async function signup(){
     const empNombre=document.getElementById('s-empresa').value.trim();
     if(!empNombre)return msg('Escribe el nombre de tu empresa');
     load(true);
-    const{data:authData,error}=await db.auth.signUp({email,password:pass,options:{data:{full_name:nombre,rol:'dueno',empresa_nombre:empNombre}}});
+    const{error}=await db.auth.signUp({email,password:pass,options:{data:{full_name:nombre,rol:'dueno',empresa_nombre:empNombre}}});
     load(false);
     if(error)return msg(error.message);
-    // Create org + miembro via edge function or directly after email confirm
-    // Store pending data in user metadata — org gets created on first login
-    msg('Cuenta creada. Revisa tu correo para confirmar tu cuenta.',true);
+    msg('Cuenta creada. Revisa tu correo para confirmar.',true);
   } else {
-    const orgId=document.getElementById('s-org').value;
-    if(!orgId)return msg('Selecciona tu empresa');
+    // Vendedor: se registra sin org, la selecciona al entrar
     load(true);
-    const{data:authData,error}=await db.auth.signUp({email,password:pass,options:{data:{full_name:nombre,rol:'vendedor',org_id:orgId}}});
+    const{error}=await db.auth.signUp({email,password:pass,options:{data:{full_name:nombre,rol:'vendedor'}}});
     load(false);
     if(error)return msg(error.message);
-    msg('Cuenta creada. Revisa tu correo para confirmar tu cuenta.',true);
+    msg('Cuenta creada. Revisa tu correo para confirmar.',true);
   }
 }
 
@@ -414,11 +421,20 @@ db.auth.onAuthStateChange(async(event,session)=>{
 async function loadAll(){
   load(true);
   // 1. Get my membership + org
-  const{data:mem}=await db.from('miembros').select('*,organizaciones(*)').eq('user_id',ME.id).single();
+  const{data:mem}=await db.from('miembros').select('*,organizaciones(*)').eq('user_id',ME.id).maybeSingle();
   if(!mem){
-    // First login — need to create org if dueño
-    await setupNuevaCuenta();
-    load(false);return;
+    const rol=ME.user_metadata?.rol||'dueno';
+    if(rol==='dueno'){
+      await setupNuevaCuenta();
+      load(false);
+      // Re-run loadAll now that org exists
+      await loadAll();return;
+    } else {
+      // Vendedor sin org — mostrar pantalla de selección
+      load(false);
+      await mostrarPantallaOrg();
+      return;
+    }
   }
   ORG=mem.organizaciones;
   MI_ROL=mem.rol;
@@ -443,43 +459,103 @@ async function loadAll(){
   load(false);
 }
 
+
+async function mostrarPantallaOrg(){
+  document.getElementById('app-screen').style.display='none';
+  document.getElementById('auth-screen').style.display='none';
+  const el=document.getElementById('org-screen');
+  el.style.display='flex';
+  // Load orgs
+  const{data,error}=await db.from('organizaciones').select('id,nombre').order('nombre');
+  const sel=document.getElementById('org-select');
+  if(error||!data||!data.length){
+    sel.innerHTML='<option value="">No hay empresas registradas aún</option>';
+    return;
+  }
+  sel.innerHTML='<option value="">— Selecciona tu empresa —</option>'+data.map(o=>`<option value="${o.id}">${o.nombre}</option>`).join('');
+}
+
+async function confirmarOrg(){
+  const orgId=document.getElementById('org-select').value;
+  const msgEl=document.getElementById('org-msg');
+  if(!orgId){msgEl.textContent='Selecciona una empresa';return;}
+  load(true);
+  const nombre=ME.user_metadata?.full_name||ME.email;
+  const{error}=await db.from('miembros').insert({org_id:orgId,user_id:ME.id,rol:'vendedor',nombre});
+  load(false);
+  if(error){msgEl.textContent='Error: '+error.message;return;}
+  document.getElementById('org-screen').style.display='none';
+  document.getElementById('app-screen').style.display='block';
+  await loadAll();
+  go('mapa');
+}
+
 async function setupNuevaCuenta(){
   const meta=ME.user_metadata||{};
   const nombre=meta.full_name||ME.email;
   const rol=meta.rol||'dueno';
   if(rol==='dueno'){
-    const empNombre=meta.empresa_nombre||'Mi Empresa';
-    // Check if org already exists (in case of double call)
-    const{data:existing}=await db.from('miembros').select('org_id,organizaciones(*)').eq('user_id',ME.id).maybeSingle();
-    if(existing){
-      ORG=existing.organizaciones;MI_ROL='dueno';MI_NOMBRE=nombre;
-    } else {
-      const{data:org,error:orgErr}=await db.from('organizaciones').insert({nombre:empNombre,owner_id:ME.id}).select().single();
-      if(orgErr){
-        alert('Error creando organización: '+orgErr.message);
-        load(false);return;
-      }
-      ORG=org;MI_ROL='dueno';MI_NOMBRE=nombre;
-      const{error:memErr}=await db.from('miembros').insert({org_id:org.id,user_id:ME.id,rol:'dueno',nombre});
-      if(memErr){alert('Error creando membresía: '+memErr.message);load(false);return;}
-    }
+    // Show a screen to enter company name (safer than relying on metadata)
+    load(false);
+    mostrarPantallaEmpresaDueno(nombre);
+    return;
   } else {
-    const orgId=meta.org_id;
-    if(!orgId){alert('No se encontró la empresa. Contacta al administrador.');load(false);return;}
-    // Check if already a member
-    const{data:existing}=await db.from('miembros').select('org_id,organizaciones(*)').eq('user_id',ME.id).maybeSingle();
-    if(existing){
-      ORG=existing.organizaciones;MI_ROL='vendedor';MI_NOMBRE=nombre;
-    } else {
-      const{data:org}=await db.from('organizaciones').select('*').eq('id',orgId).single();
-      if(!org){alert('Empresa no encontrada.');load(false);return;}
-      ORG=org;MI_ROL='vendedor';MI_NOMBRE=nombre;
-      const{error:memErr}=await db.from('miembros').insert({org_id:orgId,user_id:ME.id,rol:'vendedor',nombre});
-      if(memErr){alert('Error uniéndote al equipo: '+memErr.message);load(false);return;}
-    }
+    load(false);
+    await mostrarPantallaOrg();
+    return;
   }
-  MIEMBROS=[];D.emp=[];D.usu=[];D.act=[];D.sb={};
-  document.getElementById('tu').textContent=`${MI_NOMBRE} · ${MI_ROL==='dueno'?'Dueño':'Vendedor'}`;
+}
+
+async function crearOrgDueno(empNombre, nombre){
+  load(true);
+  // Insert org
+  const{data:org,error:orgErr}=await db.from('organizaciones').insert({nombre:empNombre,owner_id:ME.id}).select().single();
+  if(orgErr){
+    load(false);
+    document.getElementById('setup-msg').textContent='Error: '+orgErr.message;
+    return;
+  }
+  // Insert membership
+  const{error:memErr}=await db.from('miembros').insert({org_id:org.id,user_id:ME.id,rol:'dueno',nombre});
+  if(memErr){
+    load(false);
+    document.getElementById('setup-msg').textContent='Error: '+memErr.message;
+    return;
+  }
+  load(false);
+  document.getElementById('setup-screen').style.display='none';
+  document.getElementById('app-screen').style.display='block';
+  await loadAll();
+  go('mapa');
+}
+
+function mostrarPantallaEmpresaDueno(nombre){
+  document.getElementById('auth-screen').style.display='none';
+  document.getElementById('app-screen').style.display='none';
+  let el=document.getElementById('setup-screen');
+  if(!el){
+    el=document.createElement('div');
+    el.id='setup-screen';
+    el.style.cssText='min-height:100vh;background:var(--bg3);display:flex;align-items:center;justify-content:center;padding:1rem';
+    document.body.appendChild(el);
+  }
+  el.style.display='flex';
+  el.innerHTML=`
+    <div style="background:var(--bg2);border:0.5px solid var(--border2);border-radius:var(--radius-lg);padding:2rem;width:100%;max-width:400px">
+      <div style="font-size:17px;font-weight:700;color:var(--gold);margin-bottom:4px">¡Bienvenido!</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:1.5rem">Ingresa el nombre de tu empresa para comenzar</div>
+      <div style="margin-bottom:1rem">
+        <label style="display:block;font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Nombre de tu empresa</label>
+        <input id="setup-emp" type="text" placeholder="Ej: Soluciones Industriales SA"
+          style="width:100%;padding:8px 10px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg3);color:var(--text)">
+      </div>
+      <button onclick="crearOrgDueno(document.getElementById('setup-emp').value.trim(),'${nombre}')"
+        style="width:100%;padding:9px;font-size:13px;font-weight:500;background:var(--gold);color:#111;border:none;border-radius:var(--radius);cursor:pointer">
+        Crear mi empresa
+      </button>
+      <div id="setup-msg" style="font-size:12px;color:var(--red);margin-top:10px;text-align:center;min-height:16px"></div>
+      <button onclick="signout()" style="width:100%;margin-top:10px;padding:7px;font-size:12px;background:transparent;border:0.5px solid var(--border2);border-radius:var(--radius);cursor:pointer;color:var(--text2)">Cerrar sesión</button>
+    </div>`;
 }
 
 function usDeEmp(eid){return D.usu.filter(u=>u.empresa_id===eid);}
