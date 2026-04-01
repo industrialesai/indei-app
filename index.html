@@ -82,8 +82,9 @@ tbody tr.trow{background:var(--bg4);font-weight:500}
 .dot{width:7px;height:7px;border-radius:50%;display:inline-block}
 .d-v{background:#639922}.d-a{background:#EF9F27}.d-r{background:#E24B4A}.d-g{background:#888780}
 label{display:block;font-size:11px;color:var(--text2);margin-bottom:3px;text-transform:uppercase;letter-spacing:.03em}
-input,select option{background:var(--bg3);color:var(--text)}select{font-size:13px;padding:7px 10px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg3);color:var(--text);width:100%}
-input:focus,select:focus{outline:2px solid var(--gold);outline-offset:1px}
+input,select{font-size:13px;padding:7px 10px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg3);color:var(--text);width:100%}
+input,select option{background:var(--bg3);color:var(--text)}
+input:focus,select:focus{outline:2px solid var(--gold);outline-offset:1px;border-color:var(--gold-dark)}
 .grid{display:grid;gap:10px;margin-bottom:10px}
 .g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1fr 1fr 1fr}.g4{grid-template-columns:1fr 1fr 1fr 1fr}
 .btn{display:inline-flex;align-items:center;gap:6px;font-size:13px;padding:7px 16px;border:0.5px solid var(--border2);border-radius:var(--radius);background:transparent;cursor:pointer;color:var(--text)}
@@ -668,8 +669,8 @@ function rMapa(){
 function showEF(){
   const c=document.getElementById('ef-container');
   if(c.innerHTML){c.innerHTML='';return;}
-  c.innerHTML=`<div style="background:var(--bg2);border:1px solid var(--gold-dark);border-radius:var(--radius-lg);padding:1.25rem 1.5rem;margin-top:10px;margin-bottom:1rem">
-    <div style="font-size:14px;font-weight:500;color:var(--gold);margin-bottom:14px">Nueva empresa</div>
+  c.innerHTML=`<div style="background:#0a0a0a;border-left:3px solid var(--gold);border-radius:0 var(--radius-lg) var(--radius-lg) 0;padding:1.25rem 1.5rem;margin-top:10px;margin-bottom:1rem">
+    <div style="font-size:14px;font-weight:500;color:var(--gold);margin-bottom:14px;letter-spacing:.01em">Nueva empresa</div>
     <div style="max-width:320px;margin-bottom:14px"><label>Nombre de la empresa</label><input id="ef-n" placeholder="Ej: JABIL" style="margin-top:4px"></div>
     <div style="display:flex;justify-content:flex-end;gap:8px">
       <button class="btn" onclick="document.getElementById('ef-container').innerHTML=''">Cancelar</button>
@@ -692,7 +693,7 @@ async function delEmp(id){
 }
 function showUF(eid){
   const el=document.getElementById(`uform-${eid}`);if(el.innerHTML){el.innerHTML='';return;}
-  el.innerHTML=`<div style="background:var(--bg2);border:1px solid var(--gold-dark);border-radius:var(--radius-lg);padding:1.25rem 1.5rem;margin-bottom:10px">
+  el.innerHTML=`<div style="background:#0a0a0a;border-left:3px solid var(--gold);border-radius:0 var(--radius-lg) var(--radius-lg) 0;padding:1.25rem 1.5rem;margin-bottom:10px">
     <div style="font-size:14px;font-weight:500;color:var(--gold);margin-bottom:14px">Nuevo usuario</div>
     <div class="grid g4">
       <div><label>Nombre</label><input id="un-${eid}" placeholder="Ej: Enrique Flores"></div>
