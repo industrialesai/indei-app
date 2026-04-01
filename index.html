@@ -320,7 +320,7 @@ function rMapa(){
         <table><thead><tr><th>Usuario</th><th>Área</th><th class="r">Te compra</th><th class="r">% representas</th><th class="r">Compra total</th><th class="r">DSM usuario</th><th class="r">% planta</th><th>RCU</th><th></th></tr></thead>
         <tbody>${rows||`<tr><td colspan="9" class="empty" style="padding:1rem">Sin usuarios aún.</td></tr>`}${tr}</tbody></table>
       </div>
-      <div id="uf-${emp.id}"></div>
+      <div id="uform-${emp.id}"></div>
       <button class="btn btn-sm" onclick="showUF('${emp.id}')">+ Agregar usuario</button>
     </div>`;
   });
@@ -359,7 +359,7 @@ async function delEmp(id){
   load(false);rMapa();
 }
 function showUF(eid){
-  const el=document.getElementById(`uf-${eid}`);if(el.innerHTML){el.innerHTML='';return;}
+  const el=document.getElementById(`uform-${eid}`);if(el.innerHTML){el.innerHTML='';return;}
   el.innerHTML=`<div class="form-block" style="margin-bottom:10px">
     <div style="font-size:13px;font-weight:500;margin-bottom:12px">Nuevo usuario</div>
     <div class="grid g4">
@@ -369,9 +369,24 @@ function showUF(eid){
       <div></div>
     </div>
     <div class="grid g3">
-      <div><label>Facturación actual ($)</label><input type="number" id="uf-${eid}" placeholder="20000" oninput="prevU('${eid}')"></div>
-      <div><label>% que representas (0.70=70%)</label><input type="number" step="0.01" id="up-${eid}" placeholder="0.70" oninput="prevU('${eid}')"></div>
-      <div><label>% del total de la planta</label><input type="number" step="0.01" id="upp-${eid}" placeholder="0.20"></div>
+      <div><label>Facturación actual ($)</label>
+        <div style="position:relative">
+          <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text2);font-size:13px;pointer-events:none">$</span>
+          <input type="text" inputmode="numeric" id="ufact-${eid}" placeholder="20,000" style="padding-left:22px" oninput="fmtMoneyInput(this);prevU('${eid}')">
+        </div>
+      </div>
+      <div><label>% que representas</label>
+        <div style="position:relative">
+          <input type="number" min="1" max="100" step="1" id="uprep-${eid}" placeholder="70" oninput="prevU('${eid}')">
+          <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--text2);font-size:13px;pointer-events:none">%</span>
+        </div>
+      </div>
+      <div><label>% del total de la planta</label>
+        <div style="position:relative">
+          <input type="number" min="1" max="100" step="1" id="upplanta-${eid}" placeholder="20">
+          <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--text2);font-size:13px;pointer-events:none">%</span>
+        </div>
+      </div>
     </div>
     <div id="uprev-${eid}" style="display:none" class="grid g3">
       <div class="kpi"><div class="kpi-label">Compra total usuario</div><div class="kpi-value" id="uct-${eid}">—</div></div>
@@ -379,27 +394,57 @@ function showUF(eid){
       <div class="kpi"><div class="kpi-label">30% DSM</div><div class="kpi-value" style="color:var(--green)" id="u30-${eid}">—</div></div>
     </div>
     <div class="flex-end">
-      <button class="btn" onclick="document.getElementById('uf-${eid}').innerHTML=''">Cancelar</button>
+      <button class="btn" onclick="document.getElementById('uform-${eid}').innerHTML=''">Cancelar</button>
       <button class="btn btn-primary" onclick="saveU('${eid}')">Agregar usuario</button>
     </div>
   </div>`;
 }
-function prevU(eid){
-  const f=parseFloat(document.getElementById(`uf-${eid}`)?.value)||0;
-  const p=parseFloat(document.getElementById(`up-${eid}`)?.value)||0;
-  const prev=document.getElementById(`uprev-${eid}`);
-  if(f>0&&p>0&&prev){const ct=f/p,dsm=ct-f;prev.style.display='grid';document.getElementById(`uct-${eid}`).textContent=fmt(ct);document.getElementById(`udsm-${eid}`).textContent=fmt(dsm);document.getElementById(`u30-${eid}`).textContent=fmt(dsm*.3);}
+
+function fmtMoneyInput(el){
+  const raw=el.value.replace(/[^0-9]/g,'');
+  if(!raw){el.value='';return;}
+  el.value=parseInt(raw,10).toLocaleString('es-MX');
 }
+
+function getRawMoney(id){
+  const v=document.getElementById(id)?.value||'';
+  return parseFloat(v.replace(/[^0-9.]/g,''))||0;
+}
+
+function prevU(eid){
+  const f=getRawMoney(`ufact-${eid}`);
+  const p=parseFloat(document.getElementById(`uprep-${eid}`)?.value)||0;
+  const prev=document.getElementById(`uprev-${eid}`);
+  if(f>0&&p>0&&prev){
+    const pct=p/100;
+    const ct=f/pct,dsm=ct-f;
+    prev.style.display='grid';
+    document.getElementById(`uct-${eid}`).textContent=fmt(ct);
+    document.getElementById(`udsm-${eid}`).textContent=fmt(dsm);
+    document.getElementById(`u30-${eid}`).textContent=fmt(dsm*.3);
+  }
+}
+
 async function saveU(eid){
-  const nombre=document.getElementById(`un-${eid}`)?.value.trim();if(!nombre)return alert('Escribe el nombre');
-  const fact=parseFloat(document.getElementById(`uf-${eid}`)?.value)||0;
-  const pct_rep=parseFloat(document.getElementById(`up-${eid}`)?.value)||0;
-  const pct_planta=parseFloat(document.getElementById(`upp-${eid}`)?.value)||0;
-  if(!fact||!pct_rep||!pct_planta)return alert('Completa los tres campos numéricos');
+  const nombre=document.getElementById(`un-${eid}`)?.value.trim();
+  if(!nombre)return alert('Escribe el nombre del usuario');
+  const fact=getRawMoney(`ufact-${eid}`);
+  const pct_rep_pct=parseFloat(document.getElementById(`uprep-${eid}`)?.value)||0;
+  const pct_planta_pct=parseFloat(document.getElementById(`upplanta-${eid}`)?.value)||0;
+  if(!fact)return alert('Ingresa la facturación actual');
+  if(!pct_rep_pct||pct_rep_pct>100)return alert('Ingresa el % que representas (ej: 70)');
+  if(!pct_planta_pct||pct_planta_pct>100)return alert('Ingresa el % del total de la planta (ej: 20)');
+  const pct_rep=pct_rep_pct/100;
+  const pct_planta=pct_planta_pct/100;
   load(true);
-  const{data,error}=await db.from('usuarios').insert({empresa_id:eid,user_id:ME.id,nombre,area:document.getElementById(`ua-${eid}`)?.value.trim()||'',rcu:document.getElementById(`ur-${eid}`)?.value||'AMARILLO',fact,pct_rep,pct_planta}).select().single();
+  const{data,error}=await db.from('usuarios').insert({
+    empresa_id:eid,user_id:ME.id,nombre,
+    area:document.getElementById(`ua-${eid}`)?.value.trim()||'',
+    rcu:document.getElementById(`ur-${eid}`)?.value||'AMARILLO',
+    fact,pct_rep,pct_planta
+  }).select().single();
   load(false);if(error)return alert(error.message);
-  D.usu.push(data);document.getElementById(`uf-${eid}`).innerHTML='';rMapa();
+  D.usu.push(data);document.getElementById(`uform-${eid}`).innerHTML='';rMapa();
 }
 async function delU(id){
   if(!confirm('¿Eliminar este usuario?'))return;
