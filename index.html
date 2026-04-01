@@ -67,7 +67,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .metric-value{font-size:20px;font-weight:500}
 .metric-sub{font-size:11px;color:var(--text2);margin-top:2px}
 .card{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-bottom:1rem}
-.form-block{background:var(--bg4);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-bottom:1rem}
+.form-block{background:var(--bg3);border:0.5px solid rgba(201,168,76,0.18);border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-bottom:1rem}
 table{width:100%;border-collapse:collapse;font-size:13px}
 thead th{text-align:left;padding:8px 12px;font-size:11px;font-weight:500;color:var(--text2);background:var(--bg4);border-bottom:0.5px solid var(--border);white-space:nowrap}
 thead th.r{text-align:right}
@@ -99,7 +99,7 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:1px}
 .p1{background:var(--red-bg);color:var(--red)}.p2{background:var(--amber-bg);color:var(--amber)}.p3{background:var(--amber-bg);color:var(--amber)}.p4{background:var(--green-bg);color:var(--green)}.p5{background:var(--green-bg);color:var(--green)}
 .empty{text-align:center;padding:2.5rem;color:var(--text3);font-size:13px}
 .info-box{background:var(--gold-bg2);border-left:2px solid var(--gold-dark);border-radius:0 var(--radius) var(--radius) 0;padding:8px 12px;font-size:12px;color:var(--text2);line-height:1.6;margin-bottom:1rem}
-.section-label{font-size:11px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+.section-label{font-size:11px;font-weight:500;color:var(--gold-dark);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
 .act-item{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:0.5px solid var(--border)}
 .act-item:last-child{border-bottom:none}
 .act-icon{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
@@ -840,7 +840,7 @@ function rAct(){
   </div>
   ${vendedorOpts}
   <div class="card" style="margin-bottom:1rem">
-    <div style="font-size:13px;font-weight:500;margin-bottom:12px">Registrar actividad</div>
+    <div style="font-size:13px;font-weight:500;margin-bottom:12px;color:var(--gold)">Registrar actividad</div>
     <div class="grid g3">
       <div><label>Empresa</label><select id="ae" onchange="updAU()"><option value="">— Selecciona —</option>${pOpts}</select></div>
       <div><label>Usuario</label><select id="au"><option value="">— Selecciona empresa —</option></select></div>
