@@ -377,51 +377,81 @@ async function signup(){
 
 async function signout(){
   await db.auth.signOut();
+  goToLogin();
+}
+
+function goToLogin(){
+  // Clear all local storage to remove stale sessions
+  try{localStorage.clear();sessionStorage.clear();}catch(e){}
   ME=null;ORG=null;MI_ROL=null;MIEMBROS=[];
   document.getElementById('app-screen').style.display='none';
   document.getElementById('auth-screen').style.display='flex';
+  document.getElementById('org-screen').style.display='none';
+  const ss=document.getElementById('setup-screen');if(ss)ss.style.display='none';
+  load(false);
 }
 
 // On page load: check session immediately
 (async()=>{
   load(true);
-  const timeout=setTimeout(()=>{load(false);document.getElementById('auth-screen').style.display='flex';},6000);
+  const timeout=setTimeout(()=>{
+    console.warn('Session timeout — forcing login');
+    goToLogin();
+  },8000);
   try{
-    const{data:{session}}=await db.auth.getSession();
+    const{data:{session},error}=await db.auth.getSession();
     clearTimeout(timeout);
+    if(error){goToLogin();return;}
     if(session?.user){
       ME=session.user;
-      document.getElementById('tu').textContent=session.user.user_metadata?.full_name||session.user.email;
       document.getElementById('auth-screen').style.display='none';
-      document.getElementById('app-screen').style.display='block';
-      await loadAll();go('mapa');
+      try{
+        await loadAll();
+        go('mapa');
+      } catch(e){
+        console.error('loadAll failed:',e);
+        goToLogin();
+      }
     } else {
-      load(false);
-      document.getElementById('auth-screen').style.display='flex';
+      goToLogin();
     }
-  } catch(e){clearTimeout(timeout);load(false);document.getElementById('auth-screen').style.display='flex';}
+  } catch(e){
+    clearTimeout(timeout);
+    console.error('Session check failed:',e);
+    goToLogin();
+  }
 })();
 
-// Handle new logins and token refresh
+// Handle new logins, token refresh and sign out
 db.auth.onAuthStateChange(async(event,session)=>{
   if(event==='SIGNED_IN'&&session?.user&&!ME){
     ME=session.user;
-    document.getElementById('tu').textContent=session.user.user_metadata?.full_name||session.user.email;
     document.getElementById('auth-screen').style.display='none';
-    document.getElementById('app-screen').style.display='block';
-    await loadAll();go('mapa');
+    try{
+      await loadAll();
+      go('mapa');
+    } catch(e){
+      console.error('loadAll failed on sign in:',e);
+      goToLogin();
+    }
+  }
+  if(event==='TOKEN_REFRESHED'&&session?.user&&ME){
+    ME=session.user;
   }
   if(event==='SIGNED_OUT'){
-    ME=null;
-    document.getElementById('app-screen').style.display='none';
-    document.getElementById('auth-screen').style.display='flex';
+    goToLogin();
   }
 });
 
 async function loadAll(){
   load(true);
   // 1. Get my membership + org
-  const{data:mem}=await db.from('miembros').select('*,organizaciones(*)').eq('user_id',ME.id).maybeSingle();
+  let mem,memErr;
+  try{
+    const res=await db.from('miembros').select('*,organizaciones(*)').eq('user_id',ME.id).maybeSingle();
+    mem=res.data;memErr=res.error;
+  } catch(e){load(false);throw e;}
+  if(memErr){load(false);throw new Error(memErr.message);}
   if(!mem){
     const rol=ME.user_metadata?.rol||'dueno';
     if(rol==='dueno'){
