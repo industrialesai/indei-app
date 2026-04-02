@@ -1260,6 +1260,12 @@ function mesKey(d){if(!d)return'';const dt=new Date(d+'T12:00:00');return dt.get
 function addMonths(n){const d=new Date();d.setDate(1);d.setMonth(d.getMonth()+n);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
 function mesLabel(key){const[y,m]=key.split('-');return new Date(parseInt(y),parseInt(m)-1,1).toLocaleDateString('es-MX',{month:'long',year:'numeric'});}
 
+
+function abrirProy(id){proySelId=id;renderProyectos();}
+
+function cerrarFormProy(){document.getElementById("proy-form-container").innerHTML="";}
+function abrirProy(el){proySelId=el.dataset.id;renderProyectos();}
+function setProyFiltro(el){proyFiltroEtapa=el.dataset.e;renderProyectos();}
 function renderProyectos(){
   if(proySelId){renderProyectoDetalle(proySelId);return;}
   const el=document.getElementById('page-proyectos');
@@ -1283,7 +1289,7 @@ function renderProyectos(){
       const com=(D.proy_com[p.id]||[]).length;
       let extra='';
       if(p.etapa==='perdido'&&p.razon_perdido) extra='<div style="font-size:12px;color:var(--red);margin-top:6px;padding:6px 10px;background:var(--red-bg);border-radius:var(--radius)">❌ '+p.razon_perdido+'</div>';
-      cards+='<div class="card" style="cursor:pointer;margin-bottom:.75rem" onclick="proySelId=''+p.id+'';renderProyectos()">'
+      cards+='<div class="card" style="cursor:pointer;margin-bottom:.75rem" onclick="abrirProy(this.dataset.id)" data-id="'+p.id+'">'
         +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px">'
         +'<div style="flex:1"><div style="font-size:14px;font-weight:500;color:var(--texto)">'+p.nombre+'</div>'
         +'<div style="font-size:12px;color:var(--text2);margin-top:2px">'+p.empresa_nombre+' · '+p.usuario_nombre+'</div></div>'
@@ -1302,7 +1308,7 @@ function renderProyectos(){
   ['todos','analisis','cotizado','proceso_oc','cerrado','perdido'].forEach(e=>{
     const lbl=e==='todos'?'Todos':ETAPAS_PROY[e].label;
     const active=proyFiltroEtapa===e;
-    filterBtns+='<button class="btn btn-sm '+(active?'btn-primary':'')+'" onclick="proyFiltroEtapa=''+e+'';renderProyectos()">'+lbl+'</button>';
+    filterBtns+='<button class="btn btn-sm '+(active?'btn-primary':'')+'" onclick="setProyFiltro(this.dataset.e)" data-e="'+e+'">'+lbl+'</button>';
   });
 
   // Build forecast bars
@@ -1372,7 +1378,7 @@ function showFormProyecto(editId){
     +'<label>Razón del proyecto perdido <span style="color:var(--red)">*</span></label>'
     +'<input id="pf-razon" value="'+(ex&&ex.razon_perdido?ex.razon_perdido:'')+'" placeholder="Ej: Precio no competitivo..."></div>'
     +'<div class="flex-end">'
-    +'<button class="btn" onclick="document.getElementById('proy-form-container').innerHTML=''">Cancelar</button>'
+    +'<button class="btn" onclick="cerrarFormProy()">Cancelar</button>'
     +'<button class="btn btn-primary" onclick="saveProyecto('+(editId?"'"+editId+"'":'null')+')">'+(ex?'Guardar cambios':'Crear proyecto')+'</button>'
     +'</div></div>';
   if(!ex&&D.emp.length)pfUpdUsuarios();
@@ -1496,8 +1502,8 @@ async function renderProyectoDetalle(id){
     +'<div><div style="font-size:17px;font-weight:500;color:var(--texto)">'+p.nombre+'</div>'
     +'<div style="font-size:13px;color:var(--text2);margin-top:3px">'+p.empresa_nombre+' · '+p.usuario_nombre+'</div></div>'
     +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
-    +'<button class="btn btn-sm" onclick="showFormProyecto(''+p.id+'')">Editar</button>'
-    +'<button class="btn btn-sm btn-danger" onclick="deleteProyecto(''+p.id+'')">Eliminar</button>'
+    +'<button class="btn btn-sm" onclick="showFormProyecto(this.dataset.id)" data-id="'+p.id+'">Editar</button>'
+    +'<button class="btn btn-sm btn-danger" onclick="deleteProyecto(this.dataset.id)" data-id="'+p.id+'">Eliminar</button>'
     +'</div></div>'
     +'<div style="display:flex;align-items:flex-start;gap:0;margin-bottom:14px;padding:12px;background:var(--bg3);border-radius:var(--radius)">'
     +(p.etapa==='perdido'
@@ -1518,7 +1524,7 @@ async function renderProyectoDetalle(id){
     +'<textarea id="nuevo-com-'+id+'" placeholder="Agrega un comentario, detalle o avance importante..." '
     +'style="width:100%;padding:8px 10px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg3);color:var(--texto);font-size:13px;min-height:70px;resize:vertical;font-family:inherit"></textarea>'
     +'<div style="display:flex;justify-content:flex-end;margin-top:6px">'
-    +'<button class="btn btn-primary btn-sm" onclick="agregarComentario(''+id+'')">Agregar comentario</button>'
+    +'<button class="btn btn-primary btn-sm" onclick="agregarComentario(this.dataset.id)" data-id="'+id+'">Agregar comentario</button>'
     +'</div></div>'
     +'<div>'+comsHTML+'</div>'
     +'</div>';
