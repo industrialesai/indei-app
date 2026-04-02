@@ -280,6 +280,7 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:1px;border
         <button class="nav-btn" onclick="go('actividades')">Actividades</button>
         <button class="nav-btn" onclick="go('scoreboard')">Scoreboard</button>
         <button class="nav-btn" onclick="go('proyectos')">Proyectos</button>
+        <button class="nav-btn" onclick="go('seg3x3')">Seguimiento 3x3</button>
         <button class="nav-btn" onclick="go('ranking')">Ranking</button>
       </div>
     </div>
@@ -289,6 +290,7 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:1px;border
     <div id="page-actividades" class="page"></div>
     <div id="page-scoreboard" class="page"></div>
     <div id="page-proyectos" class="page"></div>
+    <div id="page-seg3x3" class="page"></div>
     <div id="page-ranking" class="page"></div>
   </div>
   <div style="text-align:center;padding:1.5rem 0 1rem;font-size:11px;color:var(--text3);letter-spacing:.04em">
@@ -305,7 +307,7 @@ let ORG=null;   // {id, nombre, owner_id}
 let MI_ROL=null; // 'dueno' | 'vendedor'
 let MI_NOMBRE='';
 let MIEMBROS=[]; // todos los miembros de la org
-const D={emp:[],usu:[],act:[],sb:{},proy:[],proy_com:{}};
+const D={emp:[],usu:[],act:[],sb:{},proy:[],proy_com:{},seg:[],seg_con:{}};
 let sbOff=0;
 let filtroVendedor='todos'; // uid o 'todos'
 let _actFD='',_actFH='';
@@ -497,10 +499,11 @@ async function loadAll(){
     db.from('actividades').select('*').eq('org_id',ORG.id).order('fecha',{ascending:false}),
     db.from('scoreboard').select('*').eq('org_id',ORG.id),
     db.from('proyectos').select('*').eq('org_id',ORG.id).order('created_at',{ascending:false}),
+    db.from('seguimientos').select('*').eq('org_id',ORG.id).order('created_at',{ascending:false}),
   ]);
   MIEMBROS=mems||[];
-  D.emp=e||[];D.usu=u||[];D.act=a||[];D.sb={};D.proy=pr||[];D.proy_com={};
-  (s||[]).forEach(r=>{
+  D.emp=e||[];D.usu=u||[];D.act=a||[];D.sb={};D.proy=pr||[];D.proy_com={};D.seg=sg||[];D.seg_con={};
+  s&&s.forEach(r=>{
     const k=r.week_key+'_'+r.user_id;
     D.sb[k]=r;
   });
@@ -651,12 +654,13 @@ function go(p){
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(x=>x.classList.remove('active'));
   document.getElementById('page-'+p).classList.add('active');
-  const idx={mapa:0,actividades:1,scoreboard:2,proyectos:3,ranking:4};
+  const idx={mapa:0,actividades:1,scoreboard:2,proyectos:3,seg3x3:4,ranking:5};
   document.querySelectorAll('.nav-btn')[idx[p]].classList.add('active');
   if(p==='mapa')rMapa();
   if(p==='actividades')rAct();
   if(p==='scoreboard')rSB();
   if(p==='proyectos')renderProyectos();
+  if(p==='seg3x3')renderSeg3x3();
   if(p==='ranking')rRank();
 }
 
@@ -983,6 +987,7 @@ const ET={
   orden:{label:'Orden de compra',icon:'✅',bg:'#EAF3DE',badge:'b-verde'},
   usuario_agregado:{label:'Usuario registrado',icon:'👤',bg:'rgba(201,168,76,0.1)',badge:'b-gris'},
   knockout_agregado:{label:'Knockout agregado',icon:'🥊',bg:'rgba(201,168,76,0.15)',badge:'b-amarillo'},
+  seguimiento_3x3:{label:'Seguimiento 3x3',icon:'🔄',bg:'rgba(83,74,183,0.12)',badge:'b-azul'},
 };
 
 function actHoy(){return today();}
@@ -1565,6 +1570,296 @@ async function agregarComentario(proyId){
   D.proy_com[proyId].push(data);
   ta.value='';
   renderProyectoDetalle(proyId);
+}
+
+
+
+// ── SEGUIMIENTO 3x3 ──
+let segFiltroVendedor='todos';
+
+function getSig3x3Days(fechaInicio){
+  // Generate Mon/Wed/Fri dates starting from fechaInicio for 4 weeks
+  const days=[];
+  const start=new Date(fechaInicio+'T12:00:00');
+  // Go back to find the current week's Mon
+  const d=new Date(start);
+  // Generate next 12 MWF days from start date
+  let cur=new Date(start);
+  // Find first MWF on or after start
+  while(![1,3,5].includes(cur.getDay()))cur.setDate(cur.getDate()+1);
+  for(let i=0;i<12;i++){
+    days.push(cur.toISOString().split('T')[0]);
+    // Next MWF
+    if(cur.getDay()===1)cur.setDate(cur.getDate()+2);      // Mon->Wed
+    else if(cur.getDay()===3)cur.setDate(cur.getDate()+2); // Wed->Fri
+    else cur.setDate(cur.getDate()+4);                      // Fri->Mon
+  }
+  return days;
+}
+
+function countPendientes(seg,contactos){
+  const hoy=today();
+  const dias=getSig3x3Days(seg.fecha_inicio);
+  return dias.filter(d=>d<=hoy&&!contactos.find(c=>c.fecha_programada===d&&c.realizado)).length;
+}
+
+async function renderSeg3x3(){
+  const el=document.getElementById('page-seg3x3');
+  // Load all contactos for active seguimientos if not cached
+  const activos=D.seg.filter(s=>s.estado==='activo');
+  for(const s of activos){
+    if(!D.seg_con[s.id]){
+      const{data}=await db.from('seguimiento_contactos').select('*').eq('seguimiento_id',s.id).order('fecha_programada');
+      D.seg_con[s.id]=data||[];
+    }
+  }
+
+  let segs=D.seg;
+  if(segFiltroVendedor!=='todos')segs=segs.filter(s=>s.vendedor_id===segFiltroVendedor);
+  const seguActivos=segs.filter(s=>s.estado==='activo');
+  const seguCerrados=segs.filter(s=>s.estado==='cerrado');
+
+  // Count total pendientes
+  let totalPend=0;
+  seguActivos.forEach(s=>{totalPend+=countPendientes(s,D.seg_con[s.id]||[]);});
+
+  // Vendor filter (dueño only)
+  let vendorHTML='';
+  if(MI_ROL==='dueno'){
+    let vbtns='<button class="btn btn-sm '+(segFiltroVendedor==='todos'?'btn-primary':'')+'" onclick="segFiltroVendedor=\'todos\';renderSeg3x3()">Todos</button>';
+    MIEMBROS.forEach(m=>{
+      vbtns+='<button class="btn btn-sm '+(segFiltroVendedor===m.user_id?'btn-primary':'')+'" onclick="sfv(this)" data-uid="'+m.user_id+'">'+m.nombre+(m.rol==='dueno'?' (Dueño)':'')+'</button>';
+    });
+    vendorHTML='<div style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Filtrar por vendedor</div>'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">'+vbtns+'</div>';
+  }
+
+  // Build active seguimientos cards
+  let activeCards='';
+  if(!seguActivos.length){
+    activeCards='<div class="empty">No hay seguimientos activos.</div>';
+  } else {
+    seguActivos.forEach(s=>{
+      const cons=D.seg_con[s.id]||[];
+      const hoy=today();
+      const dias=getSig3x3Days(s.fecha_inicio);
+      const pend=countPendientes(s,cons);
+      let diasHTML='';
+      dias.slice(0,9).forEach(d=>{
+        const con=cons.find(c=>c.fecha_programada===d);
+        const pasado=d<=hoy;
+        const hecho=con&&con.realizado;
+        const retrasado=pasado&&!hecho&&s.estado==='activo';
+        let dot='';
+        if(hecho) dot='<div style="width:28px;height:28px;border-radius:50%;background:rgba(99,153,34,0.2);border:1.5px solid #639922;display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer" onclick="verContacto(\''+s.id+'\',\''+d+'\')" title="'+fd(d)+'">✓</div>';
+        else if(retrasado) dot='<div style="width:28px;height:28px;border-radius:50%;background:rgba(226,75,74,0.15);border:1.5px solid var(--red);display:flex;align-items:center;justify-content:center;font-size:11px;cursor:pointer" onclick="registrarContacto(\''+s.id+'\',\''+d+'\')" title="Retrasado: '+fd(d)+'">!</div>';
+        else if(pasado) dot='<div style="width:28px;height:28px;border-radius:50%;background:var(--bg4);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--text3);cursor:pointer" onclick="registrarContacto(\''+s.id+'\',\''+d+'\')" title="'+fd(d)+'">—</div>';
+        else dot='<div style="width:28px;height:28px;border-radius:50%;background:var(--bg4);border:1px dashed var(--border2);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--text3)" title="'+fd(d)+'">·</div>';
+        diasHTML+=dot;
+      });
+
+      activeCards+='<div class="card" style="margin-bottom:.75rem">'
+        +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap">'
+        +'<div>'
+        +'<div style="font-size:14px;font-weight:500;color:var(--texto)">'+s.usuario_nombre+'</div>'
+        +'<div style="font-size:12px;color:var(--text2);margin-top:2px">'+s.empresa_nombre+(s.proyecto_nombre?' · <span style="color:var(--gold)">'+s.proyecto_nombre+'</span>':' · <span style="color:var(--text3)">Sin proyecto</span>')+'</div>'
+        +(MI_ROL==='dueno'?'<div style="font-size:11px;color:var(--text3);margin-top:2px">'+s.vendedor_nombre+'</div>':'')
+        +'</div>'
+        +'<div style="display:flex;align-items:center;gap:8px">'
+        +(pend>0?'<span style="background:var(--red-bg);color:var(--red);border:0.5px solid rgba(226,75,74,0.3);padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500">'+pend+' retrasado'+(pend>1?'s':'')+'</span>':'')
+        +'<button class="btn btn-sm btn-danger" onclick="cerrarSeguimiento(this.dataset.id)" data-id="'+s.id+'">Cerrar</button>'
+        +'</div>'
+        +'</div>'
+        +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'
+        +diasHTML
+        +'</div>'
+        +'<div id="seg-form-'+s.id+'"></div>'
+        +'</div>';
+    });
+  }
+
+  // Closed seguimientos (compact)
+  let closedHTML='';
+  if(seguCerrados.length){
+    closedHTML='<div style="margin-top:1.5rem">'
+      +'<div class="section-label" style="margin-bottom:8px">Seguimientos cerrados</div>';
+    seguCerrados.forEach(s=>{
+      closedHTML+='<div style="padding:8px 12px;background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);margin-bottom:6px;font-size:12px;color:var(--text2)">'
+        +'<span style="color:var(--texto);font-weight:500">'+s.usuario_nombre+'</span> — '+s.empresa_nombre
+        +(s.razon_cierre?' <span style="color:var(--text3)">· '+s.razon_cierre+'</span>':'')
+        +'</div>';
+    });
+    closedHTML+='</div>';
+  }
+
+  el.innerHTML=
+    '<div class="metrics" style="grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:1rem">'
+    +'<div class="metric"><div class="metric-label">Activos</div><div class="metric-value">'+seguActivos.length+'</div></div>'
+    +'<div class="metric"><div class="metric-label">Retrasados</div><div class="metric-value" style="color:'+(totalPend>0?'var(--red)':'var(--green)')+'">'+totalPend+'</div></div>'
+    +'<div class="metric"><div class="metric-label">Cerrados</div><div class="metric-value" style="color:var(--text2)">'+seguCerrados.length+'</div></div>'
+    +'</div>'
+    +vendorHTML
+    +'<div style="display:flex;justify-content:flex-end;margin-bottom:1rem">'
+    +'<button class="btn btn-primary" onclick="showFormSeg()">+ Iniciar seguimiento</button>'
+    +'</div>'
+    +'<div id="seg-form-container"></div>'
+    +activeCards
+    +closedHTML;
+}
+
+function sfv(el){segFiltroVendedor=el.dataset.uid;renderSeg3x3();}
+
+function showFormSeg(){
+  const c=document.getElementById('seg-form-container');
+  if(c.innerHTML){c.innerHTML='';return;}
+  let empOpts='<option value="">— Selecciona —</option>';
+  D.emp.forEach(e=>{empOpts+='<option value="'+e.id+'">'+e.nombre+'</option>';});
+  c.innerHTML='<div style="background:#0a0a0a;border-left:3px solid var(--gold);border-radius:0 var(--radius-lg) var(--radius-lg) 0;padding:1.25rem 1.5rem;margin-bottom:1rem">'
+    +'<div style="font-size:14px;font-weight:500;color:var(--gold);margin-bottom:14px">Iniciar seguimiento 3x3</div>'
+    +'<div class="grid g2" style="margin-bottom:10px">'
+    +'<div><label>Empresa</label><select id="sf-emp" onchange="sfUpdUsu()">'+empOpts+'</select></div>'
+    +'<div><label>Usuario</label><select id="sf-usu"><option>Selecciona empresa</option></select></div>'
+    +'</div>'
+    +'<div id="sf-proy-info" style="font-size:12px;color:var(--text2);margin-bottom:10px;min-height:18px"></div>'
+    +'<div class="flex-end">'
+    +'<button class="btn" onclick="document.getElementById(\'seg-form-container\').innerHTML=\'\'">Cancelar</button>'
+    +'<button class="btn btn-primary" onclick="saveSeg()">Iniciar seguimiento</button>'
+    +'</div>'
+    +'</div>';
+}
+
+function sfUpdUsu(){
+  const eid=document.getElementById('sf-emp')?.value;
+  const us=D.usu.filter(u=>u.empresa_id===eid&&!u.es_knockout);
+  const sel=document.getElementById('sf-usu');
+  if(!us.length){sel.innerHTML='<option value="">Sin usuarios</option>';return;}
+  sel.innerHTML=us.map(u=>'<option value="'+u.id+'">'+u.nombre+'</option>').join('');
+  sfUpdProy();
+}
+
+function sfUpdProy(){
+  const uid=document.getElementById('sf-usu')?.value;
+  const inf=document.getElementById('sf-proy-info');
+  if(!inf)return;
+  const proy=D.proy.find(p=>p.usuario_id===uid&&!['cerrado','perdido'].includes(p.etapa));
+  if(proy) inf.innerHTML='🔗 Proyecto vinculado: <span style="color:var(--gold)">'+proy.nombre+'</span>';
+  else inf.innerHTML='<span style="color:var(--text3)">Sin proyecto activo — se etiquetará como "Sin proyecto"</span>';
+}
+
+async function saveSeg(){
+  const eid=document.getElementById('sf-emp')?.value;
+  const uid=document.getElementById('sf-usu')?.value;
+  if(!eid||!uid)return alert('Selecciona empresa y usuario');
+  // Check no active seguimiento already exists for this user
+  const existe=D.seg.find(s=>s.usuario_id===uid&&s.estado==='activo');
+  if(existe)return alert('Ya existe un seguimiento activo para este usuario');
+  const emp=D.emp.find(e=>e.id===eid);
+  const usu=D.usu.find(u=>u.id===uid);
+  const proy=D.proy.find(p=>p.usuario_id===uid&&!['cerrado','perdido'].includes(p.etapa));
+  load(true);
+  const{data,error}=await db.from('seguimientos').insert({
+    org_id:ORG.id,
+    vendedor_id:ME.id,
+    vendedor_nombre:MI_NOMBRE,
+    empresa_id:eid,empresa_nombre:emp.nombre,
+    usuario_id:uid,usuario_nombre:usu.nombre,
+    proyecto_id:proy?.id||null,
+    proyecto_nombre:proy?.nombre||null,
+    fecha_inicio:today(),
+    estado:'activo'
+  }).select().single();
+  load(false);
+  if(error)return alert(error.message);
+  D.seg.unshift(data);
+  D.seg_con[data.id]=[];
+  document.getElementById('seg-form-container').innerHTML='';
+  renderSeg3x3();
+}
+
+function registrarContacto(segId,fecha){
+  const formId='seg-form-'+segId;
+  const el=document.getElementById(formId);
+  if(!el)return;
+  if(el.innerHTML){el.innerHTML='';return;}
+  el.innerHTML='<div style="background:#0a0a0a;border-left:3px solid var(--gold);border-radius:0 var(--radius-lg) var(--radius-lg) 0;padding:1rem 1.25rem;margin-top:10px">'
+    +'<div style="font-size:13px;font-weight:500;color:var(--gold);margin-bottom:10px">Registrar contacto — '+fd(fecha)+'</div>'
+    +'<div class="grid g2" style="margin-bottom:10px">'
+    +'<div><label>Tipo</label><select id="sc-tipo-'+segId+'"><option value="mensaje">💬 Mensaje</option><option value="llamada">📞 Llamada</option><option value="visita">🏭 Visita</option></select></div>'
+    +'<div></div>'
+    +'</div>'
+    +'<div style="margin-bottom:10px"><label>Resultado</label>'
+    +'<textarea id="sc-res-'+segId+'" placeholder="Describe cómo fue el contacto y qué resultado obtuvo..." style="width:100%;padding:7px 10px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg3);color:var(--texto);font-size:13px;min-height:60px;resize:vertical;font-family:inherit"></textarea></div>'
+    +'<div class="flex-end">'
+    +'<button class="btn" onclick="document.getElementById(\'seg-form-'+segId+'\').innerHTML=\'\'">Cancelar</button>'
+    +'<button class="btn btn-primary" onclick="saveContacto(\''+segId+'\',\''+fecha+'\')">Registrar</button>'
+    +'</div></div>';
+}
+
+function verContacto(segId,fecha){
+  const con=(D.seg_con[segId]||[]).find(c=>c.fecha_programada===fecha);
+  if(!con)return registrarContacto(segId,fecha);
+  const tipoLabel={mensaje:'💬 Mensaje',llamada:'📞 Llamada',visita:'🏭 Visita'};
+  const el=document.getElementById('seg-form-'+segId);
+  if(!el)return;
+  el.innerHTML='<div style="background:#0a0a0a;border-left:3px solid #639922;border-radius:0 var(--radius-lg) var(--radius-lg) 0;padding:1rem 1.25rem;margin-top:10px">'
+    +'<div style="font-size:13px;font-weight:500;color:#8fc45a;margin-bottom:8px">Contacto realizado — '+fd(fecha)+'</div>'
+    +'<div style="font-size:12px;color:var(--text2);margin-bottom:4px">'+(tipoLabel[con.tipo]||con.tipo)+'</div>'
+    +'<div style="font-size:13px;color:var(--texto)">'+con.resultado+'</div>'
+    +'<div style="margin-top:8px"><button class="btn btn-sm" onclick="document.getElementById(\'seg-form-'+segId+'\').innerHTML=\'\'">Cerrar</button></div>'
+    +'</div>';
+}
+
+async function saveContacto(segId,fecha){
+  const tipo=document.getElementById('sc-tipo-'+segId)?.value;
+  const resultado=document.getElementById('sc-res-'+segId)?.value.trim();
+  if(!resultado)return alert('Describe el resultado del contacto');
+  const seg=D.seg.find(s=>s.id===segId);
+  if(!seg)return;
+  load(true);
+  // Save contacto
+  const{data:con,error}=await db.from('seguimiento_contactos').insert({
+    seguimiento_id:segId,
+    org_id:ORG.id,
+    fecha_programada:fecha,
+    realizado:true,
+    fecha_realizado:today(),
+    tipo,resultado
+  }).select().single();
+  if(error){load(false);return alert(error.message);}
+
+  // Register as actividad automatically
+  const tipoLabel={mensaje:'Mensaje',llamada:'Llamada',visita:'Visita'};
+  const{data:act}=await db.from('actividades').insert({
+    org_id:ORG.id,
+    registrado_por:ME.id,
+    registrado_nombre:MI_NOMBRE,
+    empresa_id:seg.empresa_id,
+    usuario_id:seg.usuario_id,
+    empresa_nombre:seg.empresa_nombre,
+    usuario_nombre:seg.usuario_nombre,
+    estado:'seguimiento_3x3',
+    fecha:today(),
+    notas:'Seguimiento 3x3 — '+tipoLabel[tipo]+': '+resultado
+  }).select().single();
+  load(false);
+
+  if(!D.seg_con[segId])D.seg_con[segId]=[];
+  D.seg_con[segId].push(con);
+  if(act)D.act.unshift(act);
+  document.getElementById('seg-form-'+segId).innerHTML='';
+  renderSeg3x3();
+}
+
+async function cerrarSeguimiento(id){
+  const razon=prompt('¿Por qué se cierra este seguimiento?\n(Ej: Proyecto cerrado, Sin respuesta, Cambio de prioridad...)');
+  if(razon===null)return; // cancelled
+  load(true);
+  const{error}=await db.from('seguimientos').update({estado:'cerrado',razon_cierre:razon||'Sin razón indicada'}).eq('id',id);
+  load(false);
+  if(error)return alert(error.message);
+  const s=D.seg.find(x=>x.id===id);
+  if(s){s.estado='cerrado';s.razon_cierre=razon||'Sin razón indicada';}
+  renderSeg3x3();
 }
 
 
