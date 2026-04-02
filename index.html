@@ -1719,7 +1719,7 @@ async function renderSeg3x3(){
         // Next date banner
         +'<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:'+bannerBg+';border:'+bannerBorder+';border-radius:var(--radius);flex-wrap:wrap;gap:8px">'
         +'<div style="font-size:13px;color:'+bannerColor+';font-weight:500">'+bannerIcon+' '+bannerMsg+'<strong>'+nextLabel+'</strong></div>'
-        +'<button class="btn btn-sm btn-primary" style="font-size:12px" onclick="segReg(this)" data-sid="'+s.id+'">+ Registrar contacto</button>'
+        +'<button class="btn btn-sm btn-primary" style="font-size:12px" onclick="segReg(this)" data-sid="'+s.id+'">+ Registrar seguimiento</button>'
         +'</div>'
         +histHTML
         +'<div id="seg-form-'+s.id+'"></div>'
@@ -1838,7 +1838,7 @@ function registrarContacto(segId){
   if(!el)return;
   if(el.innerHTML){el.innerHTML='';return;}
   el.innerHTML='<div style="background:#0a0a0a;border-left:3px solid var(--gold);border-radius:0 var(--radius-lg) var(--radius-lg) 0;padding:1rem 1.25rem;margin-top:10px">'
-    +'<div style="font-size:13px;font-weight:500;color:var(--gold);margin-bottom:12px">Registrar contacto</div>'
+    +'<div style="font-size:13px;font-weight:500;color:var(--gold);margin-bottom:12px">Registrar seguimiento</div>'
     +'<div class="grid g2" style="margin-bottom:10px">'
     +'<div><label>Fecha del contacto</label><input type="date" id="sc-fecha-'+segId+'" value="'+today()+'" max="'+today()+'"></div>'
     +'<div><label>Tipo</label><select id="sc-tipo-'+segId+'"><option value="mensaje">💬 Mensaje</option><option value="llamada">📞 Llamada</option><option value="visita">🏭 Visita</option></select></div>'
