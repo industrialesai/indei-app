@@ -1269,6 +1269,7 @@ function cerrarFormProy(){document.getElementById("proy-form-container").innerHT
 function abrirProy(el){proySelId=el.dataset.id;renderProyectos();}
 function setProyFiltroVal(e){proyFiltroEtapa=e;renderProyectos();}
 function setProyVendedor(el){proyFiltroVendedor=typeof el==='string'?el:el.dataset.v;renderProyectos();}
+function pfv(el){proyFiltroVendedor=el.dataset.uid;renderProyectos();}
 function setProyFiltro(el){proyFiltroEtapa=el.dataset.e;renderProyectos();}
 function renderProyectos(){
   if(proySelId){renderProyectoDetalle(proySelId);return;}
@@ -1332,12 +1333,16 @@ function renderProyectos(){
 
   // Build vendor filter for dueño
   let vendorFilterHTML='';
-  if(MI_ROL==='dueno'&&MIEMBROS.length>1){
-    let vbtns='<button class="btn btn-sm '+(proyFiltroVendedor==='todos'?'btn-primary':'')+'" onclick="proyFiltroVendedor=\'todos\';renderProyectos()">Todos</button>';
+  if(MI_ROL==='dueno'){
+    let vbtns='';
+    const todosActive=proyFiltroVendedor==='todos';
+    vbtns+='<button class="btn btn-sm '+(todosActive?'btn-primary':'')+'" onclick="proyFiltroVendedor=\'todos\';renderProyectos()">Todos</button>';
     MIEMBROS.forEach(m=>{
-      vbtns+='<button class="btn btn-sm '+(proyFiltroVendedor===m.user_id?'btn-primary':'')+'" onclick="proyFiltroVendedor=\'' +m.user_id+ '\';renderProyectos()">'+m.nombre+(m.rol==='dueno'?' (Dueño)':'')+'</button>';
+      const mActive=proyFiltroVendedor===m.user_id;
+      vbtns+='<button class="btn btn-sm '+(mActive?'btn-primary':'')+'" onclick="pfv(this)" data-uid="'+m.user_id+'">'+m.nombre+(m.rol==='dueno'?' (Dueño)':'')+'</button>';
     });
-    vendorFilterHTML='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">'+vbtns+'</div>';
+    vendorFilterHTML='<div style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Filtrar por vendedor</div>'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">'+vbtns+'</div>';
   }
 
   el.innerHTML='<div class="metrics" style="grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:10px">'
