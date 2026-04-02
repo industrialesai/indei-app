@@ -994,7 +994,9 @@ function actMes(){
 function actFiltroRapido(tipo){
   let desde='',hasta='';
   if(tipo==='hoy'){desde=today();hasta=today();}
+  else if(tipo==='ayer'){const d=new Date();d.setDate(d.getDate()-1);const s=d.toISOString().split('T')[0];desde=s;hasta=s;}
   else if(tipo==='semana'){desde=actLunes();hasta='';}
+  else if(tipo==='2semanas'){const d=new Date();d.setDate(d.getDate()-13);desde=d.toISOString().split('T')[0];hasta='';}
   else if(tipo==='mes'){desde=actMes();hasta='';}
   // Store in module-level vars so rAct picks them up
   _actFD=desde;_actFH=hasta;
@@ -1048,7 +1050,9 @@ function rAct(){
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn btn-sm ${!fD&&!fH?'btn-primary':''}" onclick="actFiltroRapido('')">Todo</button>
         <button class="btn btn-sm ${fD===actHoy()&&fH===actHoy()?'btn-primary':''}" onclick="actFiltroRapido('hoy')">Hoy</button>
+        <button class="btn btn-sm" onclick="actFiltroRapido('ayer')">Ayer</button>
         <button class="btn btn-sm ${fD===actLunes()&&!fH?'btn-primary':''}" onclick="actFiltroRapido('semana')">Esta semana</button>
+        <button class="btn btn-sm" onclick="actFiltroRapido('2semanas')">Últimas 2 semanas</button>
         <button class="btn btn-sm ${fD===actMes()&&!fH?'btn-primary':''}" onclick="actFiltroRapido('mes')">Este mes</button>
       </div>
     </div>
