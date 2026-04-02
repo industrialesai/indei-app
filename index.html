@@ -306,6 +306,7 @@ let MIEMBROS=[]; // todos los miembros de la org
 const D={emp:[],usu:[],act:[],sb:{}};
 let sbOff=0;
 let filtroVendedor='todos'; // uid o 'todos'
+let _actFD='',_actFH='';
 let sbFiltroUid=null; // null = yo mismo
 let rolSeleccionado='dueno';
 
@@ -979,10 +980,31 @@ const ET={
   usuario_agregado:{label:'Usuario registrado',icon:'👤',bg:'rgba(201,168,76,0.1)',badge:'b-gris'},
   knockout_agregado:{label:'Knockout agregado',icon:'🥊',bg:'rgba(201,168,76,0.15)',badge:'b-amarillo'},
 };
+
+function actHoy(){return today();}
+function actLunes(){
+  const d=new Date();const dw=d.getDay()||7;
+  d.setDate(d.getDate()+(1-dw));
+  return d.toISOString().split('T')[0];
+}
+function actMes(){
+  const d=new Date();
+  return new Date(d.getFullYear(),d.getMonth(),1).toISOString().split('T')[0];
+}
+function actFiltroRapido(tipo){
+  let desde='',hasta='';
+  if(tipo==='hoy'){desde=today();hasta=today();}
+  else if(tipo==='semana'){desde=actLunes();hasta='';}
+  else if(tipo==='mes'){desde=actMes();hasta='';}
+  // Store in module-level vars so rAct picks them up
+  _actFD=desde;_actFH=hasta;
+  rAct();
+}
+
 function rAct(){
   const el=document.getElementById('page-actividades');
   const pOpts=D.emp.map(e=>`<option value="${e.id}">${e.nombre}</option>`).join('');
-  const fD=document.getElementById('fd')?.value||'',fH=document.getElementById('fh')?.value||'';
+  const fD=document.getElementById('fd')?.value||_actFD||'',fH=document.getElementById('fh')?.value||_actFH||'';
   let filt=[...D.act];
   if(fD)filt=filt.filter(a=>a.fecha>=fD);
   if(fH)filt=filt.filter(a=>a.fecha<=fH);
@@ -1020,6 +1042,29 @@ function rAct(){
       </div>
     </div>`:'';
   el.innerHTML=`
+  <div class="card" style="margin-bottom:1rem;padding:.875rem 1.25rem">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+      <div style="font-size:13px;font-weight:500;color:var(--gold)">Período</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-sm ${!fD&&!fH?'btn-primary':''}" onclick="actFiltroRapido('')">Todo</button>
+        <button class="btn btn-sm ${fD===actHoy()&&fH===actHoy()?'btn-primary':''}" onclick="actFiltroRapido('hoy')">Hoy</button>
+        <button class="btn btn-sm ${fD===actLunes()&&!fH?'btn-primary':''}" onclick="actFiltroRapido('semana')">Esta semana</button>
+        <button class="btn btn-sm ${fD===actMes()&&!fH?'btn-primary':''}" onclick="actFiltroRapido('mes')">Este mes</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+      <div style="flex:1;min-width:130px">
+        <label style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;display:block">Desde</label>
+        <input type="date" id="fd" value="${fD}" onchange="rAct()" style="width:100%">
+      </div>
+      <div style="flex:1;min-width:130px">
+        <label style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;display:block">Hasta</label>
+        <input type="date" id="fh" value="${fH}" onchange="rAct()" style="width:100%">
+      </div>
+      ${fD||fH?`<button class="btn btn-sm" onclick="actFiltroRapido('')" style="flex-shrink:0">× Limpiar</button>`:''}
+    </div>
+  </div>
+
   <div class="metrics">
     <div class="metric"><div class="metric-label">Actividades</div><div class="metric-value">${total}</div><div class="metric-sub">${rL}</div></div>
     <div class="metric"><div class="metric-label">Citas / Visitas</div><div class="metric-value" style="color:var(--blue)">${citas}</div></div>
@@ -1047,12 +1092,7 @@ function rAct(){
     <div class="flex-end"><button class="btn btn-primary" onclick="saveAct()">Registrar actividad</button></div>
   </div>
   <div class="card">
-    <div class="flex-between" style="margin-bottom:10px"><div class="section-label" style="margin:0">Historial</div></div>
-    <div class="fbar">
-      <div><label style="font-size:11px;color:var(--text2)">Desde</label><input type="date" id="fd" value="${fD}" onchange="rAct()"></div>
-      <div><label style="font-size:11px;color:var(--text2)">Hasta</label><input type="date" id="fh" value="${fH}" onchange="rAct()"></div>
-      <button class="btn btn-sm" onclick="document.getElementById('fd').value='';document.getElementById('fh').value='';rAct()">Limpiar</button>
-    </div>
+    <div class="section-label" style="margin-bottom:10px">Historial</div>
     <div>${aH}</div>
   </div>`;
 }
