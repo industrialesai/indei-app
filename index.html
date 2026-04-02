@@ -1004,13 +1004,13 @@ function actFiltroRapido(tipo){
 function rAct(){
   const el=document.getElementById('page-actividades');
   const pOpts=D.emp.map(e=>`<option value="${e.id}">${e.nombre}</option>`).join('');
-  const fD=document.getElementById('fd')?.value||_actFD||'',fH=document.getElementById('fh')?.value||_actFH||'';
+  const fD=_actFD||'',fH=_actFH||'';
   let filt=[...D.act];
   if(fD)filt=filt.filter(a=>a.fecha>=fD);
   if(fH)filt=filt.filter(a=>a.fecha<=fH);
   if(filtroVendedor!=='todos')filt=filt.filter(a=>a.registrado_por===filtroVendedor);
   const total=filt.length,citas=filt.filter(a=>['cita_agendada','visita_realizada'].includes(a.estado)).length,cots=filt.filter(a=>a.estado==='cotizacion').length,ocs=filt.filter(a=>a.estado==='orden').length;
-  const rL=(fD||fH)?`${fD?fd(fD):'inicio'} — ${fH?fd(fH):'hoy'}`:'Todas las fechas';
+  const rL=fD&&fH&&fD===fH?fd(fD):fD||fH?`${fD?fd(fD):'inicio'} — ${fH?fd(fH):'hoy'}`:'Todas las fechas';
   const grp={};filt.forEach(a=>{const k=a.fecha||'Sin fecha';if(!grp[k])grp[k]=[];grp[k].push(a);});
   let aH='';
   if(!filt.length)aH=`<div class="empty">${D.act.length?'Sin actividades en ese rango.':'Sin actividades aún.'}</div>`;
@@ -1055,13 +1055,13 @@ function rAct(){
     <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
       <div style="flex:1;min-width:130px">
         <label style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;display:block">Desde</label>
-        <input type="date" id="fd" value="${fD}" onchange="rAct()" style="width:100%">
+        <input type="date" id="fd" value="${fD}" onchange="_actFD=this.value;rAct()" style="width:100%">
       </div>
       <div style="flex:1;min-width:130px">
         <label style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;display:block">Hasta</label>
-        <input type="date" id="fh" value="${fH}" onchange="rAct()" style="width:100%">
+        <input type="date" id="fh" value="${fH}" onchange="_actFH=this.value;rAct()" style="width:100%">
       </div>
-      ${fD||fH?`<button class="btn btn-sm" onclick="actFiltroRapido('')" style="flex-shrink:0">× Limpiar</button>`:''}
+      ${fD||fH?`<button class="btn btn-sm" onclick="_actFD='';_actFH='';rAct()" style="flex-shrink:0">× Limpiar</button>`:''}
     </div>
   </div>
 
