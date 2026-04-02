@@ -426,8 +426,11 @@ async function iniciarApp(user){
     go('mapa');
   }catch(e){
     console.error('Error iniciando app:',e);
-    await db.auth.signOut();
-    goToLogin();
+    // Don't sign out on loadAll error - just show app with empty data
+    document.getElementById('auth-screen').style.display='none';
+    document.getElementById('app-screen').style.display='block';
+    load(false);
+    go('mapa');
   }
 }
 
@@ -486,7 +489,7 @@ async function loadAll(){
   MI_NOMBRE=mem.nombre;
   }
   // 2. Load all org data in parallel
-  const[{data:mems},{data:e},{data:u},{data:a},{data:s},{data:pr}]=await Promise.all([
+  const[{data:mems},{data:e},{data:u},{data:a},{data:s},{data:pr},{data:sg}]=await Promise.all([
     db.from('miembros').select('*').eq('org_id',ORG.id),
     db.from('empresas').select('*').eq('org_id',ORG.id).order('created_at'),
     db.from('usuarios').select('*').eq('org_id',ORG.id).order('created_at'),
