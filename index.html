@@ -449,14 +449,8 @@ db.auth.onAuthStateChange(async(event,session)=>{
     _appStarted=false;goToLogin();
   }
 });
-// Safety: clear loading overlay after 10s no matter what
-setTimeout(()=>{
-  if(document.getElementById('overlay')?.style.display!=='none'){
-    console.warn('Force-clearing stuck overlay');
-    load(false);
-    if(!ME) goToLogin();
-  }
-},10000);
+// Safety: only clear spinner after 15s, don't force logout
+setTimeout(()=>{load(false);},15000);
 
 async function loadAll(){
   load(true);
