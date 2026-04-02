@@ -619,7 +619,8 @@ function mostrarPantallaEmpresaDueno(nombre){
 
 function usDeEmp(eid){return D.usu.filter(u=>u.empresa_id===eid);}
 function calcEmp(eid){
-  const us=usDeEmp(eid);
+  // Only use non-knockout users for financial calculations
+  const us=usDeEmp(eid).filter(u=>!u.es_knockout);
   const fT=us.reduce((a,u)=>a+(u.fact||0),0);
   const sC=us.reduce((a,u)=>a+(u.fact&&u.pct_rep?u.fact/u.pct_rep:0),0);
   const sP=us.reduce((a,u)=>a+(u.pct_planta||0),0);
@@ -665,7 +666,9 @@ function rMapa(){
   else D.emp.forEach(emp=>{
     const c=calcEmp(emp.id),pr=prio(c.pep);
     const us=usDeEmp(emp.id);
-    const rows=us.map(u=>{const ct=u.fact&&u.pct_rep?u.fact/u.pct_rep:0;return`<tr>
+    const activeUs=us.filter(u=>!u.es_knockout);
+    const koUs=us.filter(u=>u.es_knockout);
+    const rows=activeUs.map(u=>{const ct=u.fact&&u.pct_rep?u.fact/u.pct_rep:0;return`<tr>
       <td style="font-weight:500">${u.nombre}</td><td>${u.area||'—'}</td>
       <td class="r">${fmt(u.fact)}</td><td class="r">${pf(u.pct_rep)}</td>
       <td class="r" style="color:var(--text2)">${fmt(ct)}</td>
@@ -673,6 +676,12 @@ function rMapa(){
       <td class="r">${pf(u.pct_planta)}</td><td>${rcub(u.rcu)}</td>
       <td><button class="btn btn-sm btn-danger" onclick="delU('${u.id}')">×</button></td>
     </tr>`;}).join('');
+    const koRows=koUs.map(u=>`<tr>
+      <td style="font-weight:500">${u.nombre}<span style="display:inline-block;margin-left:6px;font-size:10px;padding:1px 6px;border-radius:4px;background:var(--gold-bg);color:var(--gold);border:0.5px solid rgba(201,168,76,0.3)">KO</span></td>
+      <td>${u.area||'—'}</td>
+      <td>${rcub(u.rcu)}</td>
+      <td class="r"><button class="btn btn-sm" onclick="editarKO('${u.id}','${emp.id}')">Editar</button> <button class="btn btn-sm btn-danger" onclick="delU('${u.id}')">×</button></td>
+    </tr>`).join('');
     const tr=us.length?`<tr class="trow"><td>Totales</td><td></td><td class="r">${fmt(c.fT)}</td><td></td><td class="r">${fmt(c.sC)}</td><td class="r" style="color:var(--blue)">${fmt(c.sC-c.fT)}</td><td class="r">${pf(c.sP)}</td><td></td><td></td></tr>`:'';
     ph+=`<div class="card">
       <div class="flex-between" style="margin-bottom:10px">
@@ -685,10 +694,17 @@ function rMapa(){
         <div class="kpi"><div class="kpi-label">DSM</div><div class="kpi-value" style="color:var(--blue)">${fmt(c.dsm)}</div></div>
         <div class="kpi"><div class="kpi-label">PEP</div><div class="kpi-value">${pf(c.pep)}</div></div>
       </div>
-      <div style="overflow-x:auto;margin-bottom:10px;-webkit-overflow-scrolling:touch">
+      <div style="overflow-x:auto;margin-bottom:6px;-webkit-overflow-scrolling:touch">
         <table><thead><tr><th>Usuario</th><th>Área</th><th class="r">Te compra</th><th class="r">% representas</th><th class="r">Compra total</th><th class="r">DSM usuario</th><th class="r">% planta</th><th>RCU</th><th></th></tr></thead>
-        <tbody>${rows||`<tr><td colspan="9" class="empty" style="padding:1rem">Sin usuarios aún.</td></tr>`}${tr}</tbody></table>
+        <tbody>${rows||`<tr><td colspan="9" style="text-align:center;padding:.75rem;color:var(--text3);font-size:12px">Sin usuarios activos aún.</td></tr>`}${tr}</tbody></table>
       </div>
+      ${koRows?`<div style="margin-top:12px;margin-bottom:6px">
+        <div style="font-size:11px;font-weight:500;color:var(--gold);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">🥊 Knockouts</div>
+        <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+          <table><thead><tr><th>Usuario</th><th>Área</th><th>RCU</th><th class="r">Acción</th></tr></thead>
+          <tbody>${koRows}</tbody></table>
+        </div>
+      </div>`:''}
       <div id="uform-${emp.id}"></div>
       <button class="btn btn-sm" onclick="showUF('${emp.id}')">+ Agregar usuario</button>
     </div>`;
@@ -730,16 +746,35 @@ async function delEmp(id){
   D.emp=D.emp.filter(e=>e.id!==id);D.usu=D.usu.filter(u=>u.empresa_id!==id);D.act=D.act.filter(a=>a.empresa_id!==id);
   load(false);rMapa();
 }
+function toggleKnockoutFields(eid){
+  const isKO=document.getElementById(`uko-${eid}`)?.checked;
+  const fields=document.getElementById(`ufields-${eid}`);
+  if(fields)fields.style.display=isKO?'none':'block';
+}
+
 function showUF(eid){
   const el=document.getElementById(`uform-${eid}`);if(el.innerHTML){el.innerHTML='';return;}
   el.innerHTML=`<div style="background:#0a0a0a;border-left:3px solid var(--gold);border-radius:0 var(--radius-lg) var(--radius-lg) 0;padding:1.25rem 1.5rem;margin-bottom:10px">
     <div style="font-size:14px;font-weight:500;color:var(--gold);margin-bottom:14px">Nuevo usuario</div>
+
+    <div style="background:var(--gold-bg);border:0.5px solid rgba(201,168,76,0.25);border-radius:var(--radius);padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-size:13px;font-weight:500;color:var(--texto)">¿Es un Knockout?</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:2px">Referencia conseguida a través de otro usuario</div>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:13px;color:var(--texto)">
+        <input type="checkbox" id="uko-${eid}" onchange="toggleKnockoutFields('${eid}')" style="width:18px;height:18px;accent-color:var(--gold);cursor:pointer">
+        Sí, es KO
+      </label>
+    </div>
+
     <div class="grid g4">
       <div><label>Nombre</label><input id="un-${eid}" placeholder="Ej: Enrique Flores"></div>
       <div><label>Área / Depto</label><input id="ua-${eid}" placeholder="Ej: Sistemas"></div>
       <div><label>RCU</label><select id="ur-${eid}"><option value="VERDE">Verde — confianza</option><option value="AMARILLO" selected>Amarillo — cordial</option><option value="ROJO">Rojo — solo profesional</option></select></div>
       <div></div>
     </div>
+    <div id="ufields-${eid}">
     <div class="grid g3">
       <div><label>Facturación actual ($)</label>
         <div style="position:relative">
@@ -764,6 +799,7 @@ function showUF(eid){
       <div class="kpi"><div class="kpi-label">Compra total usuario</div><div class="kpi-value" id="uct-${eid}">—</div></div>
       <div class="kpi"><div class="kpi-label">DSM usuario</div><div class="kpi-value" style="color:var(--blue)" id="udsm-${eid}">—</div></div>
       <div class="kpi"><div class="kpi-label">30% DSM</div><div class="kpi-value" style="color:var(--green)" id="u30-${eid}">—</div></div>
+    </div>
     </div>
     <div class="flex-end">
       <button class="btn" onclick="document.getElementById('uform-${eid}').innerHTML=''">Cancelar</button>
@@ -797,26 +833,106 @@ function prevU(eid){
   }
 }
 
+
+async function editarKO(uid,eid){
+  // Convert a knockout to a full user by opening an edit form
+  const u=D.usu.find(x=>x.id===uid);
+  if(!u)return;
+  const el=document.getElementById(`uform-${eid}`);
+  el.innerHTML=`<div style="background:#0a0a0a;border-left:3px solid var(--gold);border-radius:0 var(--radius-lg) var(--radius-lg) 0;padding:1.25rem 1.5rem;margin-bottom:10px">
+    <div style="font-size:14px;font-weight:500;color:var(--gold);margin-bottom:14px">Completar datos de ${u.nombre}</div>
+    <div class="grid g3">
+      <div><label>Facturación actual ($)</label>
+        <div style="position:relative">
+          <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text2);font-size:13px;pointer-events:none">$</span>
+          <input type="text" inputmode="numeric" id="kofact-${uid}" placeholder="20,000" style="padding-left:22px" oninput="fmtMoneyInput(this)">
+        </div>
+      </div>
+      <div><label>% que representas</label>
+        <div style="position:relative">
+          <input type="number" min="1" max="100" step="1" id="korep-${uid}" placeholder="70">
+          <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--text2);font-size:13px;pointer-events:none">%</span>
+        </div>
+      </div>
+      <div><label>% del total de la planta</label>
+        <div style="position:relative">
+          <input type="number" min="1" max="100" step="1" id="koplanta-${uid}" placeholder="20">
+          <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--text2);font-size:13px;pointer-events:none">%</span>
+        </div>
+      </div>
+    </div>
+    <div class="flex-end">
+      <button class="btn" onclick="document.getElementById('uform-${eid}').innerHTML=''">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarDatosKO('${uid}','${eid}')">Guardar y convertir a usuario activo</button>
+    </div>
+  </div>`;
+}
+
+async function guardarDatosKO(uid,eid){
+  const fact=getRawMoney(`kofact-${uid}`);
+  const pct_rep_pct=parseFloat(document.getElementById(`korep-${uid}`)?.value)||0;
+  const pct_planta_pct=parseFloat(document.getElementById(`koplanta-${uid}`)?.value)||0;
+  if(!fact)return alert('Ingresa la facturación actual');
+  if(!pct_rep_pct||pct_rep_pct>100)return alert('Ingresa el % que representas');
+  if(!pct_planta_pct||pct_planta_pct>100)return alert('Ingresa el % del total de la planta');
+  load(true);
+  const{error}=await db.from('usuarios').update({
+    fact,pct_rep:pct_rep_pct/100,pct_planta:pct_planta_pct/100,es_knockout:false
+  }).eq('id',uid);
+  load(false);
+  if(error)return alert(error.message);
+  const u=D.usu.find(x=>x.id===uid);
+  if(u){u.fact=fact;u.pct_rep=pct_rep_pct/100;u.pct_planta=pct_planta_pct/100;u.es_knockout=false;}
+  document.getElementById(`uform-${eid}`).innerHTML='';
+  rMapa();
+}
+
 async function saveU(eid){
   const nombre=document.getElementById(`un-${eid}`)?.value.trim();
   if(!nombre)return alert('Escribe el nombre del usuario');
-  const fact=getRawMoney(`ufact-${eid}`);
-  const pct_rep_pct=parseFloat(document.getElementById(`uprep-${eid}`)?.value)||0;
-  const pct_planta_pct=parseFloat(document.getElementById(`upplanta-${eid}`)?.value)||0;
-  if(!fact)return alert('Ingresa la facturación actual');
-  if(!pct_rep_pct||pct_rep_pct>100)return alert('Ingresa el % que representas (ej: 70)');
-  if(!pct_planta_pct||pct_planta_pct>100)return alert('Ingresa el % del total de la planta (ej: 20)');
-  const pct_rep=pct_rep_pct/100;
-  const pct_planta=pct_planta_pct/100;
+  const isKO=document.getElementById(`uko-${eid}`)?.checked||false;
+  const area=document.getElementById(`ua-${eid}`)?.value.trim()||'';
+  const rcu=document.getElementById(`ur-${eid}`)?.value||'AMARILLO';
+
+  let fact=0,pct_rep=0,pct_planta=0;
+  if(!isKO){
+    fact=getRawMoney(`ufact-${eid}`);
+    const pct_rep_pct=parseFloat(document.getElementById(`uprep-${eid}`)?.value)||0;
+    const pct_planta_pct=parseFloat(document.getElementById(`upplanta-${eid}`)?.value)||0;
+    if(!fact)return alert('Ingresa la facturación actual');
+    if(!pct_rep_pct||pct_rep_pct>100)return alert('Ingresa el % que representas (ej: 70)');
+    if(!pct_planta_pct||pct_planta_pct>100)return alert('Ingresa el % del total de la planta (ej: 20)');
+    pct_rep=pct_rep_pct/100;
+    pct_planta=pct_planta_pct/100;
+  }
+
   load(true);
   const{data,error}=await db.from('usuarios').insert({
-    empresa_id:eid,org_id:ORG.id,nombre,
-    area:document.getElementById(`ua-${eid}`)?.value.trim()||'',
-    rcu:document.getElementById(`ur-${eid}`)?.value||'AMARILLO',
-    fact,pct_rep,pct_planta
+    empresa_id:eid,org_id:ORG.id,nombre,area,rcu,
+    fact,pct_rep,pct_planta,
+    es_knockout:isKO
   }).select().single();
-  load(false);if(error)return alert(error.message);
-  D.usu.push(data);document.getElementById(`uform-${eid}`).innerHTML='';rMapa();
+  load(false);
+  if(error)return alert(error.message);
+  D.usu.push(data);
+
+  // Si es knockout, registrar en scoreboard de esta semana
+  if(isKO){
+    const wk=wKey();const sk=sbKey2();const ex=D.sb[sk];
+    const koActual=parseFloat(ex?.knockouts_real||0)+1;
+    if(ex){
+      await db.from('scoreboard').update({knockouts_real:koActual}).eq('id',ex.id);
+      D.sb[sk]={...ex,knockouts_real:koActual};
+    } else {
+      const{data:sbNew}=await db.from('scoreboard').insert({
+        org_id:ORG.id,user_id:ME.id,week_key:wk,knockouts_real:1
+      }).select().single();
+      if(sbNew)D.sb[sk]=sbNew;
+    }
+  }
+
+  document.getElementById(`uform-${eid}`).innerHTML='';
+  rMapa();
 }
 async function delU(id){
   if(!confirm('¿Eliminar este usuario?'))return;
