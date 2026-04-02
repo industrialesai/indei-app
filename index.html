@@ -1254,6 +1254,7 @@ const ETAPAS_PROY={
 };
 
 let proyFiltroEtapa='todos';
+let proyFiltroVendedor='todos';
 let proySelId=null;
 
 function fmtMes(d){if(!d)return'';const dt=new Date(d+'T12:00:00');return dt.toLocaleDateString('es-MX',{month:'short',year:'numeric'});}
@@ -1266,6 +1267,8 @@ function abrirProy(id){proySelId=id;renderProyectos();}
 
 function cerrarFormProy(){document.getElementById("proy-form-container").innerHTML="";}
 function abrirProy(el){proySelId=el.dataset.id;renderProyectos();}
+function setProyFiltroVal(e){proyFiltroEtapa=e;renderProyectos();}
+function setProyVendedor(el){proyFiltroVendedor=typeof el==='string'?el:el.dataset.v;renderProyectos();}
 function setProyFiltro(el){proyFiltroEtapa=el.dataset.e;renderProyectos();}
 function renderProyectos(){
   if(proySelId){renderProyectoDetalle(proySelId);return;}
@@ -1278,7 +1281,8 @@ function renderProyectos(){
   const f1=forecast.filter(p=>mesKey(p.fecha_cierre)===mes1).reduce((a,p)=>a+(p.valor_estimado||0),0);
   const f2=forecast.filter(p=>mesKey(p.fecha_cierre)===mes2).reduce((a,p)=>a+(p.valor_estimado||0),0);
   const fMax=Math.max(f0,f1,f2,1);
-  const filtrados=proyFiltroEtapa==='todos'?proy:proy.filter(p=>p.etapa===proyFiltroEtapa);
+  let filtrados=proyFiltroEtapa==='todos'?proy:proy.filter(p=>p.etapa===proyFiltroEtapa);
+  if(proyFiltroVendedor!=='todos')filtrados=filtrados.filter(p=>p.creado_por===proyFiltroVendedor);
 
   // Build cards
   let cards='';
@@ -1309,7 +1313,7 @@ function renderProyectos(){
   ['todos','analisis','cotizado','proceso_oc','cerrado','perdido'].forEach(e=>{
     const lbl=e==='todos'?'Todos':ETAPAS_PROY[e].label;
     const active=proyFiltroEtapa===e;
-    filterBtns+='<button class="btn btn-sm '+(active?'btn-primary':'')+'" onclick="setProyFiltro(this.dataset.e)" data-e="'+e+'">'+lbl+'</button>';
+    filterBtns+='<button class="btn btn-sm '+(active?'btn-primary':'')+'" onclick="setProyFiltroVal(\'' + e + '\')" >'+lbl+'</button>';
   });
 
   // Build forecast bars
@@ -1325,8 +1329,18 @@ function renderProyectos(){
       +'</div>';
   });
 
-  el.innerHTML=
-    '<div class="metrics" style="grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:10px">'
+
+  // Build vendor filter for dueño
+  let vendorFilterHTML='';
+  if(MI_ROL==='dueno'&&MIEMBROS.length>1){
+    let vbtns='<button class="btn btn-sm '+(proyFiltroVendedor==='todos'?'btn-primary':'')+'" onclick="proyFiltroVendedor=\'todos\';renderProyectos()">Todos</button>';
+    MIEMBROS.forEach(m=>{
+      vbtns+='<button class="btn btn-sm '+(proyFiltroVendedor===m.user_id?'btn-primary':'')+'" onclick="proyFiltroVendedor=\'' +m.user_id+ '\';renderProyectos()">'+m.nombre+(m.rol==='dueno'?' (Dueño)':'')+'</button>';
+    });
+    vendorFilterHTML='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">'+vbtns+'</div>';
+  }
+
+  el.innerHTML='<div class="metrics" style="grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:10px">'
     +'<div class="metric"><div class="metric-label">Proyectos activos</div><div class="metric-value">'+activos.length+'</div></div>'
     +'<div class="metric"><div class="metric-label">En análisis</div><div class="metric-value" style="color:var(--blue)">'+proy.filter(p=>p.etapa==='analisis').length+'</div></div>'
     +'<div class="metric"><div class="metric-label">Cotizados</div><div class="metric-value" style="color:var(--amber)">'+proy.filter(p=>p.etapa==='cotizado').length+'</div></div>'
@@ -1340,7 +1354,8 @@ function renderProyectos(){
     +'<div style="font-size:13px;font-weight:500;color:var(--gold);margin-bottom:12px">Forecast — próximos 3 meses</div>'
     +'<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">'+forecastHTML+'</div>'
     +'</div>'
-    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px">'
+  +vendorFilterHTML
+  +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px">'
     +'<div style="display:flex;gap:6px;flex-wrap:wrap">'+filterBtns+'</div>'
     +'<button class="btn btn-primary" onclick="showFormProyecto()">+ Nuevo proyecto</button>'
     +'</div>'
