@@ -1574,128 +1574,154 @@ async function agregarComentario(proyId){
 // ── SEGUIMIENTO 3x3 ──
 let segFiltroVendedor='todos';
 
-function getSig3x3Days(fechaInicio){
-  // Generate Mon/Wed/Fri dates starting from fechaInicio for 4 weeks
-  const days=[];
-  const start=new Date(fechaInicio+'T12:00:00');
-  // Go back to find the current week's Mon
-  const d=new Date(start);
-  // Generate next 12 MWF days from start date
-  let cur=new Date(start);
-  // Find first MWF on or after start
-  while(![1,3,5].includes(cur.getDay()))cur.setDate(cur.getDate()+1);
-  for(let i=0;i<12;i++){
-    days.push(cur.toISOString().split('T')[0]);
-    // Next MWF
-    if(cur.getDay()===1)cur.setDate(cur.getDate()+2);      // Mon->Wed
-    else if(cur.getDay()===3)cur.setDate(cur.getDate()+2); // Wed->Fri
-    else cur.setDate(cur.getDate()+4);                      // Fri->Mon
-  }
-  return days;
+function nextMWFAfter(dateStr){
+  const d=new Date(dateStr+'T12:00:00');
+  const dow=d.getDay();
+  let add;
+  if(dow===1)add=2;      // Mon->Wed
+  else if(dow===3)add=2; // Wed->Fri
+  else if(dow===5)add=3; // Fri->Mon
+  else if(dow===0)add=1; // Sun->Mon
+  else if(dow===2)add=1; // Tue->Wed
+  else if(dow===4)add=1; // Thu->Fri
+  else add=2;            // Sat->Mon
+  d.setDate(d.getDate()+add);
+  return d.toISOString().split('T')[0];
 }
 
-function countPendientes(seg,contactos){
+function nextMWFOnOrAfter(dateStr){
+  const d=new Date(dateStr+'T12:00:00');
+  const dow=d.getDay();
+  if(dow===1||dow===3||dow===5)return dateStr;
+  return nextMWFAfter(dateStr);
+}
+
+function getMWFLabel(dateStr){
+  const dt=new Date(dateStr+'T12:00:00');
+  const dow=dt.getDay();
+  const dias={1:'Lunes',3:'Miércoles',5:'Viernes'};
+  return (dias[dow]||'')+' '+dt.toLocaleDateString('es-MX',{day:'numeric',month:'short'});
+}
+
+function getNextSeguimientoDate(seg,cons){
+  const realizados=cons.filter(c=>c.realizado&&c.fecha_realizado).sort((a,b)=>b.fecha_realizado.localeCompare(a.fecha_realizado));
+  const base=realizados.length?realizados[0].fecha_realizado:seg.fecha_inicio;
+  return nextMWFAfter(base);
+}
+
+function countSegRetrasados(seg,cons){
+  // Count MWF days from inicio to today that have no contact
   const hoy=today();
-  const dias=getSig3x3Days(seg.fecha_inicio);
-  return dias.filter(d=>d<=hoy&&!contactos.find(c=>c.fecha_programada===d&&c.realizado)).length;
+  let count=0;
+  let cur=nextMWFOnOrAfter(seg.fecha_inicio);
+  while(cur<=hoy){
+    const done=cons.find(c=>c.realizado&&c.fecha_realizado&&c.fecha_realizado===cur);
+    if(!done)count++;
+    cur=nextMWFAfter(cur);
+  }
+  return count;
 }
 
 async function renderSeg3x3(){
   const el=document.getElementById('page-seg3x3');
-  const activos=D.seg.filter(s=>s.estado==='activo');
-  for(const s of activos){
+  const activosAll=D.seg.filter(s=>s.estado==='activo');
+  for(const s of activosAll){
     if(!D.seg_con[s.id]){
-      const{data}=await db.from('seguimiento_contactos').select('*').eq('seguimiento_id',s.id).order('fecha_programada');
+      const{data}=await db.from('seguimiento_contactos').select('*').eq('seguimiento_id',s.id).order('fecha_realizado',{ascending:false});
       D.seg_con[s.id]=data||[];
     }
   }
-  let segs=D.seg;
+  let segs=[...D.seg];
   if(segFiltroVendedor!=='todos')segs=segs.filter(s=>s.vendedor_id===segFiltroVendedor);
   const seguActivos=segs.filter(s=>s.estado==='activo');
   const seguCerrados=segs.filter(s=>s.estado==='cerrado');
-  let totalPend=0;
-  seguActivos.forEach(s=>{totalPend+=countPendientes(s,D.seg_con[s.id]||[]);});
+
+  let totalRetrasados=0;
+  seguActivos.forEach(s=>{ totalRetrasados+=countSegRetrasados(s,D.seg_con[s.id]||[]); });
 
   // Vendor filter
   let vendorHTML='';
   if(MI_ROL==='dueno'){
+    const todosAct=segFiltroVendedor==='todos';
     const btns=MIEMBROS.map(m=>{
       const act=segFiltroVendedor===m.user_id;
       return '<button class="btn btn-sm '+(act?'btn-primary':'')+'" onclick="sfv(this)" data-uid="'+m.user_id+'">'+m.nombre+(m.rol==='dueno'?' (Dueño)':'')+'</button>';
     }).join('');
-    const todosAct=segFiltroVendedor==='todos';
     vendorHTML='<div style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Filtrar por vendedor</div>'
       +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">'
       +'<button class="btn btn-sm '+(todosAct?'btn-primary':'')+'" onclick="segResetVendedor()">Todos</button>'
       +btns+'</div>';
   }
 
-  // Build active cards
+  // Active cards
   let activeCards='';
   if(!seguActivos.length){
     activeCards='<div class="empty">No hay seguimientos activos.</div>';
   } else {
     seguActivos.forEach(s=>{
       const cons=D.seg_con[s.id]||[];
-      const hoyStr=today();
-      const dias=getSig3x3Days(s.fecha_inicio);
-      const pend=countPendientes(s,cons);
+      const realizados=cons.filter(c=>c.realizado);
+      const retrasados=countSegRetrasados(s,cons);
+      const nextDate=getNextSeguimientoDate(s,cons);
+      const nextLabel=getMWFLabel(nextDate);
+      const hoy=today();
+      const esHoy=nextDate===hoy;
+      const bannerRetrasado=nextDate<hoy;
 
-      let diasHTML='<div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">';
-      dias.slice(0,9).forEach(d=>{
-        const con=cons.find(c=>c.fecha_programada===d);
-        const pasado=d<=hoyStr;
-        const hecho=con&&con.realizado;
-        const retrasado=pasado&&!hecho;
-        const esHoy=d===hoyStr;
-        const dt=new Date(d+'T12:00:00');
-        const diaSemana=dt.toLocaleDateString('es-MX',{weekday:'long'});
-        const diaMes=dt.toLocaleDateString('es-MX',{day:'numeric',month:'short'});
-        const tipoLabel={llamada:'📞 Llamada',mensaje:'💬 Mensaje',visita:'🏭 Visita'};
+      // Status badges
+      const badgeReal='<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;font-size:11px;background:rgba(99,153,34,0.12);color:#8fc45a;border:0.5px solid rgba(99,153,34,0.3)">✓ '+realizados.length+' realizado'+(realizados.length!==1?'s':'')+'</span>';
+      const badgeRet=retrasados>0
+        ?'<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;font-size:11px;background:rgba(226,75,74,0.1);color:var(--red);border:0.5px solid rgba(226,75,74,0.3)">⚠️ '+retrasados+' retrasado'+(retrasados!==1?'s':'')+'</span>'
+        :'<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;font-size:11px;background:rgba(99,153,34,0.08);color:#8fc45a;border:0.5px solid rgba(99,153,34,0.2)">✓ Al día</span>';
 
-        let bg,border,labelColor,iconTxt,accionHTML;
-        if(hecho){
-          bg='rgba(99,153,34,0.08)';border='0.5px solid rgba(99,153,34,0.3)';labelColor='#8fc45a';iconTxt='✓';
-          const resumen=con.resultado?con.resultado.substring(0,60)+(con.resultado.length>60?'...':''):'';
-          accionHTML='<div style="font-size:11px;color:var(--text2)">'+(tipoLabel[con.tipo]||'')
-            +(resumen?' — <span style="color:var(--texto)">'+resumen+'</span>':'')+'</div>'
-            +'<button class="btn btn-sm" style="font-size:11px;padding:3px 8px" onclick="segVer(this)" data-sid="'+s.id+'" data-d="'+d+'">Ver</button>';
-        } else if(esHoy){
-          bg='rgba(201,168,76,0.08)';border='0.5px solid rgba(201,168,76,0.3)';labelColor='var(--gold)';iconTxt='→';
-          accionHTML='<span style="font-size:11px;color:var(--gold);font-weight:500">Hoy</span>'
-            +'<button class="btn btn-sm btn-primary" style="font-size:11px;padding:3px 10px" onclick="segReg(this)" data-sid="'+s.id+'" data-d="'+d+'">Registrar contacto</button>';
-        } else if(retrasado){
-          bg='rgba(226,75,74,0.08)';border='0.5px solid rgba(226,75,74,0.3)';labelColor='var(--red)';iconTxt='!';
-          accionHTML='<span style="font-size:11px;color:var(--red);font-weight:500">Retrasado</span>'
-            +'<button class="btn btn-sm btn-primary" style="font-size:11px;padding:3px 10px" onclick="segReg(this)" data-sid="'+s.id+'" data-d="'+d+'">Registrar ahora</button>';
-        } else {
-          bg='var(--bg3)';border='0.5px solid var(--border)';labelColor='var(--text3)';iconTxt='·';
-          accionHTML='<span style="font-size:11px;color:var(--text3)">Próximo</span>';
-        }
+      // Next date banner
+      const bannerBg=esHoy?'rgba(201,168,76,0.1)':bannerRetrasado?'rgba(226,75,74,0.08)':'var(--bg3)';
+      const bannerBorder=esHoy?'0.5px solid rgba(201,168,76,0.3)':bannerRetrasado?'0.5px solid rgba(226,75,74,0.3)':'0.5px solid var(--border)';
+      const bannerColor=esHoy?'var(--gold)':bannerRetrasado?'var(--red)':'var(--text2)';
+      const bannerIcon=esHoy?'🔔':bannerRetrasado?'⚠️':'📅';
+      const bannerMsg=esHoy?'¡Hoy es día de seguimiento! ':bannerRetrasado?'Seguimiento retrasado — ':'Próximo seguimiento: ';
 
-        const iconStyle='width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;font-weight:700;color:'+(hecho?'#639922':retrasado?'var(--red)':esHoy?'var(--gold)':'var(--text3)');
-        diasHTML+='<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:'+bg+';border:'+border+';border-radius:var(--radius)">'
-          +'<div style="'+iconStyle+'">'+iconTxt+'</div>'
-          +'<div style="flex:1;min-width:0;font-size:12px;font-weight:500;color:'+labelColor+';text-transform:capitalize">'+diaSemana+' '+diaMes+'</div>'
-          +'<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">'+accionHTML+'</div>'
+      // History (collapsed by default)
+      const histId='seg-hist-'+s.id;
+      let histHTML='';
+      if(realizados.length){
+        const tipoIcon={llamada:'📞',mensaje:'💬',visita:'🏭'};
+        let rows='';
+        [...realizados].sort((a,b)=>b.fecha_realizado.localeCompare(a.fecha_realizado)).forEach(c=>{
+          const dt=new Date((c.fecha_realizado||today())+'T12:00:00');
+          const fechaStr=dt.toLocaleDateString('es-MX',{weekday:'short',day:'numeric',month:'short'});
+          rows+='<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:0.5px solid var(--border)">'
+            +'<span style="font-size:15px;flex-shrink:0">'+(tipoIcon[c.tipo]||'📋')+'</span>'
+            +'<div style="flex:1;min-width:0">'
+            +'<div style="font-size:12px;font-weight:500;color:var(--texto)">'+fechaStr+'</div>'
+            +(c.resultado?'<div style="font-size:12px;color:var(--text2);margin-top:3px;line-height:1.5">'+c.resultado+'</div>':'')
+            +'</div></div>';
+        });
+        histHTML='<div style="margin-top:10px">'
+          +'<button class="btn btn-sm" style="font-size:11px;width:100%;justify-content:center" onclick="segToggleHist(this)" data-id="'+histId+'">Ver historial ('+realizados.length+')</button>'
+          +'<div id="'+histId+'" style="display:none;margin-top:8px">'+rows+'</div>'
           +'</div>';
-      });
-      diasHTML+='</div>';
+      }
 
       activeCards+='<div class="card" style="margin-bottom:.75rem">'
-        +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px;flex-wrap:wrap">'
-        +'<div>'
+        // Header
+        +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px;flex-wrap:wrap">'
+        +'<div style="flex:1;min-width:0">'
         +'<div style="font-size:14px;font-weight:500;color:var(--texto)">'+s.usuario_nombre+'</div>'
         +'<div style="font-size:12px;color:var(--text2);margin-top:2px">'+s.empresa_nombre
-        +(s.proyecto_nombre?' · <span style="color:var(--gold)">'+s.proyecto_nombre+'</span>':' · <span style="color:var(--text3)">Sin proyecto</span>')
-        +'</div>'
+        +(s.proyecto_nombre?' · <span style="color:var(--gold)">'+s.proyecto_nombre+'</span>':' · <span style="color:var(--text3)">Sin proyecto</span>')+'</div>'
         +(MI_ROL==='dueno'?'<div style="font-size:11px;color:var(--text3);margin-top:2px">'+s.vendedor_nombre+'</div>':'')
         +'</div>'
-        +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
-        +(pend>0?'<span style="background:var(--red-bg);color:var(--red);border:0.5px solid rgba(226,75,74,0.3);padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500">'+pend+' retrasado'+(pend>1?'s':'')+'</span>':'')
         +'<button class="btn btn-sm btn-danger" onclick="segCerrar(this.dataset.id)" data-id="'+s.id+'">Cerrar</button>'
-        +'</div></div>'
-        +diasHTML
+        +'</div>'
+        // Badges
+        +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">'+badgeReal+badgeRet+'</div>'
+        // Next date banner
+        +'<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:'+bannerBg+';border:'+bannerBorder+';border-radius:var(--radius);flex-wrap:wrap;gap:8px">'
+        +'<div style="font-size:13px;color:'+bannerColor+';font-weight:500">'+bannerIcon+' '+bannerMsg+'<strong>'+nextLabel+'</strong></div>'
+        +'<button class="btn btn-sm btn-primary" style="font-size:12px" onclick="segReg(this)" data-sid="'+s.id+'">+ Registrar contacto</button>'
+        +'</div>'
+        +histHTML
         +'<div id="seg-form-'+s.id+'"></div>'
         +'</div>';
     });
@@ -1704,10 +1730,13 @@ async function renderSeg3x3(){
   // Closed
   let closedHTML='';
   if(seguCerrados.length){
-    closedHTML='<div style="margin-top:1.5rem"><div class="section-label" style="margin-bottom:8px">Seguimientos cerrados</div>';
+    closedHTML='<div style="margin-top:1.5rem"><div class="section-label" style="margin-bottom:8px">Cerrados ('+seguCerrados.length+')</div>';
     seguCerrados.forEach(s=>{
+      const cons=D.seg_con[s.id]||[];
+      const real=cons.filter(c=>c.realizado).length;
       closedHTML+='<div style="padding:8px 12px;background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);margin-bottom:6px;font-size:12px;color:var(--text2)">'
         +'<span style="color:var(--texto);font-weight:500">'+s.usuario_nombre+'</span> — '+s.empresa_nombre
+        +(real?' <span style="color:var(--text3)">· '+real+' contacto'+(real!==1?'s':'')+'</span>':'')
         +(s.razon_cierre?' <span style="color:var(--text3)">· '+s.razon_cierre+'</span>':'')
         +'</div>';
     });
@@ -1717,7 +1746,7 @@ async function renderSeg3x3(){
   el.innerHTML=
     '<div class="metrics" style="grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:1rem">'
     +'<div class="metric"><div class="metric-label">Activos</div><div class="metric-value">'+seguActivos.length+'</div></div>'
-    +'<div class="metric"><div class="metric-label">Retrasados</div><div class="metric-value" style="color:'+(totalPend>0?'var(--red)':'var(--green)')+'">'+totalPend+'</div></div>'
+    +'<div class="metric"><div class="metric-label">Retrasados</div><div class="metric-value" style="color:'+(totalRetrasados>0?'var(--red)':'var(--green)')+'">'+totalRetrasados+'</div></div>'
     +'<div class="metric"><div class="metric-label">Cerrados</div><div class="metric-value" style="color:var(--text2)">'+seguCerrados.length+'</div></div>'
     +'</div>'
     +vendorHTML
@@ -1730,13 +1759,16 @@ async function renderSeg3x3(){
 }
 
 function segResetVendedor(){segFiltroVendedor='todos';renderSeg3x3();}
-function segVer(el){verContacto(el.dataset.sid,el.dataset.d);}
-function segReg(el){registrarContacto(el.dataset.sid,el.dataset.d);}
-function segCerrar(id){cerrarSeguimiento(id);}
-
-
-
 function sfv(el){segFiltroVendedor=el.dataset.uid;renderSeg3x3();}
+function segReg(el){registrarContacto(el.dataset.sid);}
+function segCerrar(id){cerrarSeguimiento(id);}
+function segToggleHist(btn){
+  const el=document.getElementById(btn.dataset.id);
+  if(!el)return;
+  const open=el.style.display!=='none';
+  el.style.display=open?'none':'block';
+  btn.textContent=open?btn.textContent.replace('▲','Ver historial'):btn.textContent.replace('Ver historial','▲ Ocultar historial');
+}
 
 function showFormSeg(){
   const c=document.getElementById('seg-form-container');
@@ -1747,15 +1779,16 @@ function showFormSeg(){
     +'<div style="font-size:14px;font-weight:500;color:var(--gold);margin-bottom:14px">Iniciar seguimiento 3x3</div>'
     +'<div class="grid g2" style="margin-bottom:10px">'
     +'<div><label>Empresa</label><select id="sf-emp" onchange="sfUpdUsu()">'+empOpts+'</select></div>'
-    +'<div><label>Usuario</label><select id="sf-usu"><option>Selecciona empresa</option></select></div>'
+    +'<div><label>Usuario</label><select id="sf-usu" onchange="sfUpdProy()"><option>Selecciona empresa</option></select></div>'
     +'</div>'
     +'<div id="sf-proy-info" style="font-size:12px;color:var(--text2);margin-bottom:10px;min-height:18px"></div>'
     +'<div class="flex-end">'
-    +'<button class="btn" onclick="document.getElementById(\'seg-form-container\').innerHTML=\'\'">Cancelar</button>'
+    +'<button class="btn" onclick="cerrarFormSeg()">Cancelar</button>'
     +'<button class="btn btn-primary" onclick="saveSeg()">Iniciar seguimiento</button>'
-    +'</div>'
-    +'</div>';
+    +'</div></div>';
 }
+
+function cerrarFormSeg(){const c=document.getElementById('seg-form-container');if(c)c.innerHTML='';}
 
 function sfUpdUsu(){
   const eid=document.getElementById('sf-emp')?.value;
@@ -1771,15 +1804,14 @@ function sfUpdProy(){
   const inf=document.getElementById('sf-proy-info');
   if(!inf)return;
   const proy=D.proy.find(p=>p.usuario_id===uid&&!['cerrado','perdido'].includes(p.etapa));
-  if(proy) inf.innerHTML='🔗 Proyecto vinculado: <span style="color:var(--gold)">'+proy.nombre+'</span>';
-  else inf.innerHTML='<span style="color:var(--text3)">Sin proyecto activo — se etiquetará como "Sin proyecto"</span>';
+  if(proy)inf.innerHTML='🔗 Proyecto vinculado: <span style="color:var(--gold)">'+proy.nombre+'</span>';
+  else inf.innerHTML='<span style="color:var(--text3)">Sin proyecto activo — se etiquetará "Sin proyecto"</span>';
 }
 
 async function saveSeg(){
   const eid=document.getElementById('sf-emp')?.value;
   const uid=document.getElementById('sf-usu')?.value;
   if(!eid||!uid)return alert('Selecciona empresa y usuario');
-  // Check no active seguimiento already exists for this user
   const existe=D.seg.find(s=>s.usuario_id===uid&&s.estado==='activo');
   if(existe)return alert('Ya existe un seguimiento activo para este usuario');
   const emp=D.emp.find(e=>e.id===eid);
@@ -1787,93 +1819,63 @@ async function saveSeg(){
   const proy=D.proy.find(p=>p.usuario_id===uid&&!['cerrado','perdido'].includes(p.etapa));
   load(true);
   const{data,error}=await db.from('seguimientos').insert({
-    org_id:ORG.id,
-    vendedor_id:ME.id,
-    vendedor_nombre:MI_NOMBRE,
+    org_id:ORG.id,vendedor_id:ME.id,vendedor_nombre:MI_NOMBRE,
     empresa_id:eid,empresa_nombre:emp.nombre,
     usuario_id:uid,usuario_nombre:usu.nombre,
-    proyecto_id:proy?.id||null,
-    proyecto_nombre:proy?.nombre||null,
-    fecha_inicio:today(),
-    estado:'activo'
+    proyecto_id:proy?.id||null,proyecto_nombre:proy?.nombre||null,
+    fecha_inicio:today(),estado:'activo'
   }).select().single();
   load(false);
   if(error)return alert(error.message);
   D.seg.unshift(data);
   D.seg_con[data.id]=[];
-  document.getElementById('seg-form-container').innerHTML='';
+  cerrarFormSeg();
   renderSeg3x3();
 }
 
-function registrarContacto(segId,fecha){
-  const formId='seg-form-'+segId;
-  const el=document.getElementById(formId);
+function registrarContacto(segId){
+  const el=document.getElementById('seg-form-'+segId);
   if(!el)return;
   if(el.innerHTML){el.innerHTML='';return;}
   el.innerHTML='<div style="background:#0a0a0a;border-left:3px solid var(--gold);border-radius:0 var(--radius-lg) var(--radius-lg) 0;padding:1rem 1.25rem;margin-top:10px">'
-    +'<div style="font-size:13px;font-weight:500;color:var(--gold);margin-bottom:10px">Registrar contacto — '+fd(fecha)+'</div>'
+    +'<div style="font-size:13px;font-weight:500;color:var(--gold);margin-bottom:12px">Registrar contacto</div>'
     +'<div class="grid g2" style="margin-bottom:10px">'
+    +'<div><label>Fecha del contacto</label><input type="date" id="sc-fecha-'+segId+'" value="'+today()+'" max="'+today()+'"></div>'
     +'<div><label>Tipo</label><select id="sc-tipo-'+segId+'"><option value="mensaje">💬 Mensaje</option><option value="llamada">📞 Llamada</option><option value="visita">🏭 Visita</option></select></div>'
-    +'<div></div>'
     +'</div>'
     +'<div style="margin-bottom:10px"><label>Resultado</label>'
-    +'<textarea id="sc-res-'+segId+'" placeholder="Describe cómo fue el contacto y qué resultado obtuvo..." style="width:100%;padding:7px 10px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg3);color:var(--texto);font-size:13px;min-height:60px;resize:vertical;font-family:inherit"></textarea></div>'
+    +'<textarea id="sc-res-'+segId+'" placeholder="¿Cómo fue el contacto? ¿Qué resultado obtuviste?" style="width:100%;padding:7px 10px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg3);color:var(--texto);font-size:13px;min-height:70px;resize:vertical;font-family:inherit"></textarea></div>'
     +'<div class="flex-end">'
     +'<button class="btn" onclick="document.getElementById(\'seg-form-'+segId+'\').innerHTML=\'\'">Cancelar</button>'
-    +'<button class="btn btn-primary" onclick="saveContacto(\''+segId+'\',\''+fecha+'\')">Registrar</button>'
+    +'<button class="btn btn-primary" onclick="saveContacto(this.dataset.sid)" data-sid="'+segId+'">Guardar</button>'
     +'</div></div>';
 }
 
-function verContacto(segId,fecha){
-  const con=(D.seg_con[segId]||[]).find(c=>c.fecha_programada===fecha);
-  if(!con)return registrarContacto(segId,fecha);
-  const tipoLabel={mensaje:'💬 Mensaje',llamada:'📞 Llamada',visita:'🏭 Visita'};
-  const el=document.getElementById('seg-form-'+segId);
-  if(!el)return;
-  el.innerHTML='<div style="background:#0a0a0a;border-left:3px solid #639922;border-radius:0 var(--radius-lg) var(--radius-lg) 0;padding:1rem 1.25rem;margin-top:10px">'
-    +'<div style="font-size:13px;font-weight:500;color:#8fc45a;margin-bottom:8px">Contacto realizado — '+fd(fecha)+'</div>'
-    +'<div style="font-size:12px;color:var(--text2);margin-bottom:4px">'+(tipoLabel[con.tipo]||con.tipo)+'</div>'
-    +'<div style="font-size:13px;color:var(--texto)">'+con.resultado+'</div>'
-    +'<div style="margin-top:8px"><button class="btn btn-sm" onclick="document.getElementById(\'seg-form-'+segId+'\').innerHTML=\'\'">Cerrar</button></div>'
-    +'</div>';
-}
-
-async function saveContacto(segId,fecha){
+async function saveContacto(segId){
   const tipo=document.getElementById('sc-tipo-'+segId)?.value;
   const resultado=document.getElementById('sc-res-'+segId)?.value.trim();
+  const fechaRealizado=document.getElementById('sc-fecha-'+segId)?.value||today();
   if(!resultado)return alert('Describe el resultado del contacto');
   const seg=D.seg.find(s=>s.id===segId);
   if(!seg)return;
   load(true);
-  // Save contacto
   const{data:con,error}=await db.from('seguimiento_contactos').insert({
-    seguimiento_id:segId,
-    org_id:ORG.id,
-    fecha_programada:fecha,
-    realizado:true,
-    fecha_realizado:today(),
-    tipo,resultado
+    seguimiento_id:segId,org_id:ORG.id,
+    fecha_programada:fechaRealizado,realizado:true,
+    fecha_realizado:fechaRealizado,tipo,resultado
   }).select().single();
   if(error){load(false);return alert(error.message);}
-
-  // Register as actividad automatically
   const tipoLabel={mensaje:'Mensaje',llamada:'Llamada',visita:'Visita'};
   const{data:act}=await db.from('actividades').insert({
-    org_id:ORG.id,
-    registrado_por:ME.id,
-    registrado_nombre:MI_NOMBRE,
-    empresa_id:seg.empresa_id,
-    usuario_id:seg.usuario_id,
-    empresa_nombre:seg.empresa_nombre,
-    usuario_nombre:seg.usuario_nombre,
-    estado:'seguimiento_3x3',
-    fecha:today(),
+    org_id:ORG.id,registrado_por:ME.id,registrado_nombre:MI_NOMBRE,
+    empresa_id:seg.empresa_id,usuario_id:seg.usuario_id,
+    empresa_nombre:seg.empresa_nombre,usuario_nombre:seg.usuario_nombre,
+    estado:'seguimiento_3x3',fecha:fechaRealizado,
     notas:'Seguimiento 3x3 — '+tipoLabel[tipo]+': '+resultado
   }).select().single();
   load(false);
-
   if(!D.seg_con[segId])D.seg_con[segId]=[];
-  D.seg_con[segId].push(con);
+  D.seg_con[segId].unshift(con);
   if(act)D.act.unshift(act);
   document.getElementById('seg-form-'+segId).innerHTML='';
   renderSeg3x3();
@@ -1881,7 +1883,7 @@ async function saveContacto(segId,fecha){
 
 async function cerrarSeguimiento(id){
   const razon=prompt('¿Por qué se cierra este seguimiento?\n(Ej: Proyecto cerrado, Sin respuesta, Cambio de prioridad...)');
-  if(razon===null)return; // cancelled
+  if(razon===null)return;
   load(true);
   const{error}=await db.from('seguimientos').update({estado:'cerrado',razon_cierre:razon||'Sin razón indicada'}).eq('id',id);
   load(false);
@@ -1890,6 +1892,7 @@ async function cerrarSeguimiento(id){
   if(s){s.estado='cerrado';s.razon_cierre=razon||'Sin razón indicada';}
   renderSeg3x3();
 }
+
 
 
 // ── RANKING ──
