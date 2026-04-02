@@ -417,25 +417,26 @@ function goToLogin(){
 
 async function iniciarApp(user){
   ME=user;
-  // Hide auth immediately, show app — no blocking overlay
+  // Hide auth immediately, show app
   document.getElementById('auth-screen').style.display='none';
   document.getElementById('app-screen').style.display='block';
-  // Show subtle loading in the page area
+  // Show loading text in mapa area while data loads
   document.getElementById('page-mapa').innerHTML='<div style="padding:2rem;text-align:center;color:var(--text2);font-size:13px">Cargando datos...</div>';
-  // Activate mapa tab visually
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   document.getElementById('page-mapa').classList.add('active');
   document.querySelectorAll('.nav-btn').forEach((x,i)=>{if(i===0)x.classList.add('active');else x.classList.remove('active');});
-  // Update topbar
   const meta=user.user_metadata||{};
   document.getElementById('tu').textContent=(meta.full_name||user.email)+' · Cargando...';
   try{
     await loadAll();
-    go('mapa');
   }catch(e){
-    console.error('Error cargando datos:',e);
-    // Still show app, just with empty data
-    go('mapa');
+    console.error('Error en loadAll:',e);
+  }
+  // Always render mapa after loadAll, success or fail
+  try{rMapa();}catch(e){console.error('rMapa error:',e);}
+  // Update header with real name
+  if(MI_NOMBRE&&MI_ROL){
+    document.getElementById('tu').textContent=MI_NOMBRE+' · '+(MI_ROL==='dueno'?'Dueño':'Vendedor');
   }
 }
 
