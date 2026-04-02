@@ -417,19 +417,24 @@ function goToLogin(){
 
 async function iniciarApp(user){
   ME=user;
-  load(true);
+  // Hide auth immediately, show app — no blocking overlay
+  document.getElementById('auth-screen').style.display='none';
+  document.getElementById('app-screen').style.display='block';
+  // Show subtle loading in the page area
+  document.getElementById('page-mapa').innerHTML='<div style="padding:2rem;text-align:center;color:var(--text2);font-size:13px">Cargando datos...</div>';
+  // Activate mapa tab visually
+  document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+  document.getElementById('page-mapa').classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach((x,i)=>{if(i===0)x.classList.add('active');else x.classList.remove('active');});
+  // Update topbar
+  const meta=user.user_metadata||{};
+  document.getElementById('tu').textContent=(meta.full_name||user.email)+' · Cargando...';
   try{
     await loadAll();
-    document.getElementById('auth-screen').style.display='none';
-    document.getElementById('app-screen').style.display='block';
-    load(false);
     go('mapa');
   }catch(e){
-    console.error('Error iniciando app:',e);
-    // Don't sign out on loadAll error - just show app with empty data
-    document.getElementById('auth-screen').style.display='none';
-    document.getElementById('app-screen').style.display='block';
-    load(false);
+    console.error('Error cargando datos:',e);
+    // Still show app, just with empty data
     go('mapa');
   }
 }
