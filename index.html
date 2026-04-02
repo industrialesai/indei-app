@@ -632,7 +632,6 @@ function autoWeek(wk,uid){
   const d=new Date(wk+'T12:00:00');const f=new Date(d);f.setDate(d.getDate()+4);
   const fs=f.toISOString().split('T')[0];
   const inR=dt=>dt&&dt>=wk&&dt<=fs;
-  // If uid provided, filter to that user; otherwise current user only (for scoreboard)
   const acts=uid?D.act.filter(a=>a.registrado_por===uid):D.act.filter(a=>a.registrado_por===ME.id);
   return{
     contactos:acts.filter(a=>inR(a.fecha)&&['contactado','intento'].includes(a.estado)).length,
@@ -640,6 +639,7 @@ function autoWeek(wk,uid){
     visitas:acts.filter(a=>{const u=a.fecha_prog||a.fecha;return inR(u)&&a.estado==='visita_realizada';}).length,
     cotizaciones:acts.filter(a=>inR(a.fecha)&&a.estado==='cotizacion').length,
     ordenes:acts.filter(a=>inR(a.fecha)&&a.estado==='orden').length,
+    knockouts:acts.filter(a=>inR(a.fecha)&&a.estado==='knockout_agregado').length,
   };
 }
 
@@ -883,6 +883,26 @@ async function guardarDatosKO(uid,eid){
   if(error)return alert(error.message);
   const u=D.usu.find(x=>x.id===uid);
   if(u){u.fact=fact;u.pct_rep=pct_rep_pct/100;u.pct_planta=pct_planta_pct/100;u.es_knockout=false;}
+  // Registrar actividad automática
+  const emp=D.emp.find(e=>e.id===eid);
+  if(emp){
+    const estadoAct=isKO?'knockout_agregado':'usuario_agregado';
+    const notasAct=isKO?`Knockout agregado: ${nombre}${area?' ('+area+')':''}`:`Nuevo usuario registrado: ${nombre}${area?' ('+area+')':''}`;
+    const{data:actData}=await db.from('actividades').insert({
+      org_id:ORG.id,
+      registrado_por:ME.id,
+      registrado_nombre:MI_NOMBRE,
+      empresa_id:eid,
+      usuario_id:data.id,
+      empresa_nombre:emp.nombre,
+      usuario_nombre:nombre,
+      estado:estadoAct,
+      fecha:today(),
+      notas:notasAct
+    }).select().single();
+    if(actData)D.act.unshift(actData);
+  }
+
   document.getElementById(`uform-${eid}`).innerHTML='';
   rMapa();
 }
@@ -916,19 +936,26 @@ async function saveU(eid){
   if(error)return alert(error.message);
   D.usu.push(data);
 
-  // Si es knockout, registrar en scoreboard de esta semana
-  if(isKO){
-    const wk=wKey();const sk=sbKey2();const ex=D.sb[sk];
-    const koActual=parseFloat(ex?.knockouts_real||0)+1;
-    if(ex){
-      await db.from('scoreboard').update({knockouts_real:koActual}).eq('id',ex.id);
-      D.sb[sk]={...ex,knockouts_real:koActual};
-    } else {
-      const{data:sbNew}=await db.from('scoreboard').insert({
-        org_id:ORG.id,user_id:ME.id,week_key:wk,knockouts_real:1
-      }).select().single();
-      if(sbNew)D.sb[sk]=sbNew;
-    }
+  // Knockouts se calculan automáticamente desde actividades (autoWeek)
+
+  // Registrar actividad automática
+  const emp=D.emp.find(e=>e.id===eid);
+  if(emp){
+    const estadoAct=isKO?'knockout_agregado':'usuario_agregado';
+    const notasAct=isKO?`Knockout agregado: ${nombre}${area?' ('+area+')':''}`:`Nuevo usuario registrado: ${nombre}${area?' ('+area+')':''}`;
+    const{data:actData}=await db.from('actividades').insert({
+      org_id:ORG.id,
+      registrado_por:ME.id,
+      registrado_nombre:MI_NOMBRE,
+      empresa_id:eid,
+      usuario_id:data.id,
+      empresa_nombre:emp.nombre,
+      usuario_nombre:nombre,
+      estado:estadoAct,
+      fecha:today(),
+      notas:notasAct
+    }).select().single();
+    if(actData)D.act.unshift(actData);
   }
 
   document.getElementById(`uform-${eid}`).innerHTML='';
@@ -949,6 +976,8 @@ const ET={
   cotizacion:{label:'Cotización enviada',icon:'📄',bg:'#FAEEDA',badge:'b-amarillo'},
   seguimiento:{label:'En seguimiento',icon:'🔁',bg:'#E6F1FB',badge:'b-azul'},
   orden:{label:'Orden de compra',icon:'✅',bg:'#EAF3DE',badge:'b-verde'},
+  usuario_agregado:{label:'Usuario registrado',icon:'👤',bg:'rgba(201,168,76,0.1)',badge:'b-gris'},
+  knockout_agregado:{label:'Knockout agregado',icon:'🥊',bg:'rgba(201,168,76,0.15)',badge:'b-amarillo'},
 };
 function rAct(){
   const el=document.getElementById('page-actividades');
@@ -1066,9 +1095,9 @@ const AM=[
   {key:'visitas',label:'Visitas en planta',icon:'🏭',sub:'por fecha programada'},
   {key:'cotizaciones',label:'Cotizaciones',icon:'📄',sub:'por fecha de registro'},
   {key:'ordenes',label:'Órdenes de compra',icon:'✅',sub:'por fecha de registro'},
+  {key:'knockouts',label:'Knockouts',icon:'🥊',sub:'usuarios knockout agregados esta semana'},
 ];
 const MM=[
-  {key:'knockouts',label:'Knockouts',icon:'🥊',sub:'nuevos usuarios laterales'},
   {key:'power_knockouts',label:'Power knockouts',icon:'⚡',sub:'gerentes / supervisores nuevos'},
   {key:'facturacion',label:'Facturación',icon:'💰',sub:'monto facturado ($)',isMoney:true},
 ];
