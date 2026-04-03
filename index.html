@@ -878,9 +878,9 @@ async function editarKO(uid,eid){
 function koFormCerrar(el){const f=document.getElementById("uform-"+el.dataset.eid);if(f)f.innerHTML="";}
 function koDatosGuardar(el){guardarDatosKO(el.dataset.uid,el.dataset.eid);}
 async function guardarDatosKO(uid,eid){
-  const fact=getRawMoney(`kofact-${uid}`);
-  const pct_rep_pct=parseFloat(document.getElementById(`korep-${uid}`)?.value)||0;
-  const pct_planta_pct=parseFloat(document.getElementById(`koplanta-${uid}`)?.value)||0;
+  const fact=getRawMoney('kofact-'+uid);
+  const pct_rep_pct=parseFloat(document.getElementById('korep-'+uid)?.value)||0;
+  const pct_planta_pct=parseFloat(document.getElementById('koplanta-'+uid)?.value)||0;
   if(isNaN(fact)||fact<0)return alert('Ingresa la facturación actual (puede ser 0)');
   if(!pct_rep_pct||pct_rep_pct>100)return alert('Ingresa el % que representas');
   if(!pct_planta_pct||pct_planta_pct>100)return alert('Ingresa el % del total de la planta');
@@ -890,29 +890,28 @@ async function guardarDatosKO(uid,eid){
   }).eq('id',uid);
   load(false);
   if(error)return alert(error.message);
+  // Update in memory
   const u=D.usu.find(x=>x.id===uid);
   if(u){u.fact=fact;u.pct_rep=pct_rep_pct/100;u.pct_planta=pct_planta_pct/100;u.es_knockout=false;}
-  // Registrar actividad automática
+  // Registrar actividad: usuario convertido de KO a activo
   const emp=D.emp.find(e=>e.id===eid);
-  if(emp){
-    const estadoAct=isKO?'knockout_agregado':'usuario_agregado';
-    const notasAct=isKO?`Knockout agregado: ${nombre}${area?' ('+area+')':''}`:`Nuevo usuario registrado: ${nombre}${area?' ('+area+')':''}`;
+  if(emp&&u){
     const{data:actData}=await db.from('actividades').insert({
       org_id:ORG.id,
       registrado_por:ME.id,
       registrado_nombre:MI_NOMBRE,
       empresa_id:eid,
-      usuario_id:data.id,
+      usuario_id:uid,
       empresa_nombre:emp.nombre,
-      usuario_nombre:nombre,
-      estado:estadoAct,
+      usuario_nombre:u.nombre,
+      estado:'usuario_agregado',
       fecha:today(),
-      notas:notasAct
+      notas:'Knockout convertido a usuario activo: '+u.nombre
     }).select().single();
     if(actData)D.act.unshift(actData);
   }
 
-  document.getElementById(`uform-${eid}`).innerHTML='';
+  document.getElementById('uform-'+eid).innerHTML='';
   rMapa();
 }
 
@@ -1019,27 +1018,25 @@ async function saveU(eid){
 
   // Knockouts se calculan automáticamente desde actividades (autoWeek)
 
-  // Registrar actividad automática
+  // Registrar actividad: usuario convertido de KO a activo
   const emp=D.emp.find(e=>e.id===eid);
-  if(emp){
-    const estadoAct=isKO?'knockout_agregado':'usuario_agregado';
-    const notasAct=isKO?`Knockout agregado: ${nombre}${area?' ('+area+')':''}`:`Nuevo usuario registrado: ${nombre}${area?' ('+area+')':''}`;
+  if(emp&&u){
     const{data:actData}=await db.from('actividades').insert({
       org_id:ORG.id,
       registrado_por:ME.id,
       registrado_nombre:MI_NOMBRE,
       empresa_id:eid,
-      usuario_id:data.id,
+      usuario_id:uid,
       empresa_nombre:emp.nombre,
-      usuario_nombre:nombre,
-      estado:estadoAct,
+      usuario_nombre:u.nombre,
+      estado:'usuario_agregado',
       fecha:today(),
-      notas:notasAct
+      notas:'Knockout convertido a usuario activo: '+u.nombre
     }).select().single();
     if(actData)D.act.unshift(actData);
   }
 
-  document.getElementById(`uform-${eid}`).innerHTML='';
+  document.getElementById('uform-'+eid).innerHTML='';
   rMapa();
 }
 async function delU(id){
