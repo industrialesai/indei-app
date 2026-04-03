@@ -1442,9 +1442,11 @@ function renderProyectos(){
 }
 
 
-function editarOportunidad(id){proySelId=null;renderProyectos();setTimeout(()=>showFormProyecto(id),80);}
+function editarOportunidad(id){proySelId=id;renderProyectos();setTimeout(()=>showFormProyecto(id),80);}
 function showFormProyecto(editId){
-  const c=document.getElementById('proy-form-container');
+  let c=document.getElementById('proy-form-container-detalle');
+  if(!c||!c.isConnected)c=document.getElementById('proy-form-container');
+  if(!c)return;
   if(c.innerHTML&&!editId){c.innerHTML='';return;}
   const ex=editId?D.proy.find(p=>p.id===editId):null;
   let empOpts='';
@@ -1593,6 +1595,7 @@ async function renderProyectoDetalle(id){
 
   el.innerHTML=
     '<div style="margin-bottom:1rem"><button class="btn btn-sm" onclick="proySelId=null;renderProyectos()">← Volver a oportunidades</button></div>'
+    +'<div id="proy-form-container-detalle"></div>'
     +'<div class="card" style="margin-bottom:1rem">'
     +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:12px;flex-wrap:wrap">'
     +'<div><div style="font-size:17px;font-weight:500;color:var(--texto)">'+p.nombre+'</div>'
