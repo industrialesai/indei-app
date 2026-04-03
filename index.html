@@ -1018,24 +1018,18 @@ async function saveU(eid){
 
   // Knockouts se calculan automáticamente desde actividades (autoWeek)
 
-  // Registrar actividad: usuario convertido de KO a activo
+  // Registrar actividad automática
   const emp=D.emp.find(e=>e.id===eid);
-  if(emp&&u){
+  if(emp&&data){
+    const estadoAct=isKO?'knockout_agregado':'usuario_agregado';
+    const notasAct=isKO?'Knockout agregado: '+nombre+(area?' ('+area+')':''):'Nuevo usuario registrado: '+nombre+(area?' ('+area+')':'');
     const{data:actData}=await db.from('actividades').insert({
-      org_id:ORG.id,
-      registrado_por:ME.id,
-      registrado_nombre:MI_NOMBRE,
-      empresa_id:eid,
-      usuario_id:uid,
-      empresa_nombre:emp.nombre,
-      usuario_nombre:u.nombre,
-      estado:'usuario_agregado',
-      fecha:today(),
-      notas:'Knockout convertido a usuario activo: '+u.nombre
+      org_id:ORG.id,registrado_por:ME.id,registrado_nombre:MI_NOMBRE,
+      empresa_id:eid,usuario_id:data.id,empresa_nombre:emp.nombre,
+      usuario_nombre:nombre,estado:estadoAct,fecha:today(),notas:notasAct
     }).select().single();
     if(actData)D.act.unshift(actData);
   }
-
   document.getElementById('uform-'+eid).innerHTML='';
   rMapa();
 }
