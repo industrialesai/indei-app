@@ -279,7 +279,7 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:1px;border
         <button class="nav-btn active" onclick="go('mapa')">Mapa del Éxito</button>
         <button class="nav-btn" onclick="go('actividades')">Actividades</button>
         <button class="nav-btn" onclick="go('scoreboard')">Scoreboard</button>
-        <button class="nav-btn" onclick="go('proyectos')">Proyectos</button>
+        <button class="nav-btn" onclick="go('proyectos')">Oportunidades</button>
         <button class="nav-btn" onclick="go('seg3x3')">Seguimiento 3x3</button>
         <button class="nav-btn" onclick="go('ranking')">Ranking</button>
       </div>
@@ -695,7 +695,7 @@ function rMapa(){
       <td style="font-weight:500">${u.nombre}<span style="display:inline-block;margin-left:6px;font-size:10px;padding:1px 6px;border-radius:4px;background:var(--gold-bg);color:var(--gold);border:0.5px solid rgba(201,168,76,0.3)">KO</span></td>
       <td>${u.area||'—'}</td>
       <td>${rcub(u.rcu)}</td>
-      <td class="r"><button class="btn btn-sm" onclick="editarKO('${u.id}','${emp.id}')">Editar</button> <button class="btn btn-sm btn-danger" onclick="delU('${u.id}')">×</button></td>
+      <td class="r"><button class="btn btn-sm" onclick="editarKO('${u.id}','${emp.id}')">Actualizar</button> <button class="btn btn-sm btn-danger" onclick="delU('${u.id}')">×</button></td>
     </tr>`).join('');
     const tr=us.length?`<tr class="trow"><td>Totales</td><td></td><td class="r">${fmt(c.fT)}</td><td></td><td class="r">${fmt(c.sC)}</td><td class="r" style="color:var(--blue)">${fmt(c.sC-c.fT)}</td><td class="r">${pf(c.sP)}</td><td></td><td></td></tr>`:'';
     ph+=`<div class="card">
@@ -1356,7 +1356,7 @@ function renderProyectos(){
   // Build cards
   let cards='';
   if(!filtrados.length){
-    cards='<div class="empty">No hay proyectos'+(proyFiltroEtapa!=='todos'?' en esta etapa':'')+'.</div>';
+    cards='<div class="empty">No hay oportunidades'+(proyFiltroEtapa!=='todos'?' en esta etapa':'')+'.</div>';
   } else {
     filtrados.forEach(p=>{
       const et=ETAPAS_PROY[p.etapa]||ETAPAS_PROY.analisis;
@@ -1367,7 +1367,7 @@ function renderProyectos(){
         +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px">'
         +'<div style="flex:1"><div style="font-size:14px;font-weight:500;color:var(--texto)">'+p.nombre+'</div>'
         +'<div style="font-size:12px;color:var(--text2);margin-top:2px">'+p.empresa_nombre+' · '+p.usuario_nombre+'</div></div>'
-        +'<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:500;background:'+et.bg+';color:'+et.color+';flex-shrink:0">'+et.icon+' '+et.label+'</span>'
+        +'<span style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;background:'+et.bg+';color:'+et.color+';flex-shrink:0;border:1px solid '+et.color+'40">'+et.icon+' '+et.label+'</span>'
         +'</div>'
         +'<div style="display:flex;gap:16px;font-size:12px;color:var(--text2)">'
         +'<span>💰 '+fmt(p.valor_estimado)+'</span>'
@@ -1414,7 +1414,7 @@ function renderProyectos(){
   }
 
   el.innerHTML='<div class="metrics" style="grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:10px">'
-    +'<div class="metric"><div class="metric-label">Proyectos activos</div><div class="metric-value">'+activos.length+'</div></div>'
+    +'<div class="metric"><div class="metric-label">Oportunidades activas</div><div class="metric-value">'+activos.length+'</div></div>'
     +'<div class="metric"><div class="metric-label">En análisis</div><div class="metric-value" style="color:var(--blue)">'+proy.filter(p=>p.etapa==='analisis').length+'</div></div>'
     +'<div class="metric"><div class="metric-label">Cotizados</div><div class="metric-value" style="color:var(--amber)">'+proy.filter(p=>p.etapa==='cotizado').length+'</div></div>'
     +'</div>'
@@ -1430,7 +1430,7 @@ function renderProyectos(){
   +vendorFilterHTML
   +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px">'
     +'<div style="display:flex;gap:6px;flex-wrap:wrap">'+filterBtns+'</div>'
-    +'<button class="btn btn-primary" onclick="showFormProyecto()">+ Nuevo proyecto</button>'
+    +'<button class="btn btn-primary" onclick="showFormProyecto()">+ Nueva oportunidad</button>'
     +'</div>'
     +'<div id="proy-form-container"></div>'
     +cards;
@@ -1446,7 +1446,7 @@ function showFormProyecto(editId){
   Object.entries(ETAPAS_PROY).forEach(([k,v])=>{etOpts+='<option value="'+k+'"'+((ex?ex.etapa:'analisis')===k?' selected':'')+'>'+v.icon+' '+v.label+'</option>';});
   const razDisplay=(ex&&ex.etapa==='perdido')?'block':'none';
   c.innerHTML='<div style="background:#0a0a0a;border-left:3px solid var(--gold);border-radius:0 var(--radius-lg) var(--radius-lg) 0;padding:1.25rem 1.5rem;margin-bottom:1rem">'
-    +'<div style="font-size:14px;font-weight:500;color:var(--gold);margin-bottom:14px">'+(ex?'Editar proyecto':'Nuevo proyecto')+'</div>'
+    +'<div style="font-size:14px;font-weight:500;color:var(--gold);margin-bottom:14px">'+(ex?'Actualizar oportunidad':'Nueva oportunidad')+'</div>'
     +'<div class="grid g2" style="margin-bottom:10px">'
     +'<div><label>Empresa</label><select id="pf-emp" onchange="pfUpdUsuarios()">'+empOpts+'</select></div>'
     +'<div><label>Usuario</label><select id="pf-usu">'+(ex?'<option value="'+ex.usuario_id+'">'+ex.usuario_nombre+'</option>':'<option>Selecciona empresa</option>')+'</select></div>'
@@ -1468,7 +1468,7 @@ function showFormProyecto(editId){
     +'<input id="pf-razon" value="'+(ex&&ex.razon_perdido?ex.razon_perdido:'')+'" placeholder="Ej: Precio no competitivo..."></div>'
     +'<div class="flex-end">'
     +'<button class="btn" onclick="cerrarFormProy()">Cancelar</button>'
-    +'<button class="btn btn-primary" onclick="saveProyecto('+(editId?"'"+editId+"'":'null')+')">'+(ex?'Guardar cambios':'Crear proyecto')+'</button>'
+    +'<button class="btn btn-primary" onclick="saveProyecto('+(editId?"'"+editId+"'":'null')+')">'+(ex?'Guardar cambios':'Crear oportunidad')+'</button>'
     +'</div></div>';
   if(!ex&&D.emp.length)pfUpdUsuarios();
 }
@@ -1528,7 +1528,7 @@ async function saveProyecto(editId){
 }
 
 async function deleteProyecto(id){
-  if(!confirm('¿Eliminar este proyecto?'))return;
+  if(!confirm('¿Eliminar esta oportunidad?'))return;
   load(true);
   await db.from('proyectos').delete().eq('id',id);
   D.proy=D.proy.filter(p=>p.id!==id);
@@ -1591,7 +1591,7 @@ async function renderProyectoDetalle(id){
     +'<div><div style="font-size:17px;font-weight:500;color:var(--texto)">'+p.nombre+'</div>'
     +'<div style="font-size:13px;color:var(--text2);margin-top:3px">'+p.empresa_nombre+' · '+p.usuario_nombre+'</div></div>'
     +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
-    +'<button class="btn btn-sm" onclick="showFormProyecto(this.dataset.id)" data-id="'+p.id+'">Editar</button>'
+    +'<button class="btn btn-primary btn-sm" onclick="showFormProyecto(this.dataset.id)" data-id="'+p.id+'">✏️ Actualizar oportunidad</button>'
     +'<button class="btn btn-sm btn-danger" onclick="deleteProyecto(this.dataset.id)" data-id="'+p.id+'">Eliminar</button>'
     +'</div></div>'
     +'<div style="display:flex;align-items:flex-start;gap:0;margin-bottom:14px;padding:12px;background:var(--bg3);border-radius:var(--radius)">'
