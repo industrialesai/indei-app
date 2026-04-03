@@ -662,7 +662,7 @@ function go(p){
   if(p==='mapa')rMapa();
   if(p==='actividades')rAct();
   if(p==='scoreboard')rSB();
-  if(p==='proyectos')renderProyectos();
+  if(p==='proyectos'){proySelId=null;renderProyectos();}
   if(p==='seg3x3')renderSeg3x3();
   if(p==='ranking')rRank();
 }
@@ -1532,7 +1532,11 @@ async function saveProyecto(editId){
     D.proy.unshift(data);
     proySelId=null;
   }
-  document.getElementById('proy-form-container').innerHTML='';
+  // Clear whichever form container is active
+  const fc1=document.getElementById('proy-form-container');
+  const fc2=document.getElementById('proy-form-container-detalle');
+  if(fc1)fc1.innerHTML='';
+  if(fc2)fc2.innerHTML='';
   renderProyectos();
 }
 
