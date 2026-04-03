@@ -884,7 +884,7 @@ async function guardarDatosKO(uid,eid){
   const fact=getRawMoney(`kofact-${uid}`);
   const pct_rep_pct=parseFloat(document.getElementById(`korep-${uid}`)?.value)||0;
   const pct_planta_pct=parseFloat(document.getElementById(`koplanta-${uid}`)?.value)||0;
-  if(!fact)return alert('Ingresa la facturación actual');
+  if(isNaN(fact)||fact<0)return alert('Ingresa la facturación actual (puede ser 0)');
   if(!pct_rep_pct||pct_rep_pct>100)return alert('Ingresa el % que representas');
   if(!pct_planta_pct||pct_planta_pct>100)return alert('Ingresa el % del total de la planta');
   load(true);
@@ -931,9 +931,13 @@ async function saveU(eid){
     fact=getRawMoney(`ufact-${eid}`);
     const pct_rep_pct=parseFloat(document.getElementById(`uprep-${eid}`)?.value)||0;
     const pct_planta_pct=parseFloat(document.getElementById(`upplanta-${eid}`)?.value)||0;
-    if(!fact)return alert('Ingresa la facturación actual');
+    if(isNaN(fact)||fact<0)return alert('Ingresa la facturación actual (puede ser 0)');
     if(!pct_rep_pct||pct_rep_pct>100)return alert('Ingresa el % que representas (ej: 70)');
     if(!pct_planta_pct||pct_planta_pct>100)return alert('Ingresa el % del total de la planta (ej: 20)');
+    // Validar que % planta no supere 100%
+    const otrosUsu=D.usu.filter(u=>u.empresa_id===eid&&!u.es_knockout);
+    const sumaPlanta=Math.round(otrosUsu.reduce((a,u)=>a+(u.pct_planta||0)*100,0));
+    if(sumaPlanta+pct_planta_pct>100)return alert('El % de la planta no puede superar 100%. Ya suman '+sumaPlanta+'%. Máximo disponible: '+(100-sumaPlanta)+'%.');
     pct_rep=pct_rep_pct/100;
     pct_planta=pct_planta_pct/100;
   }
