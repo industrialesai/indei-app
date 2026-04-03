@@ -18,21 +18,26 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#111111;
-  --bg2:#1a1a1a;
-  --bg3:#0d0d0d;
-  --bg4:#222222;
-  --text:#f0ede6;
-  --text2:#9a9590;
-  --text3:#5a5550;
-  --border:rgba(255,255,255,0.08);
-  --border2:rgba(255,255,255,0.14);
-  --radius:8px;--radius-lg:12px;
-  --gold:#c9a84c;
-  --gold-light:#e8c97a;
-  --gold-dark:#8a6d2a;
+  --bg:#0C0F14;
+  --bg2:#161E28;
+  --bg3:#080A0C;
+  --bg4:#1E2A38;
+  --sb-bg:#0C0F14;
+  --sb-w:240px;
+  --text:#F0EDE6;
+  --text2:#7A8A9A;
+  --text3:#3A4A5A;
+  --texto:#F0EDE6;
+  --border:rgba(255,255,255,0.06);
+  --border2:rgba(255,255,255,0.1);
+  --radius:6px;--radius-lg:10px;
+  --gold:#C9A84C;
+  --gold-light:#E8C96A;
+  --gold-dark:#A07830;
   --gold-bg:rgba(201,168,76,0.12);
-  --gold-bg2:rgba(201,168,76,0.06);
+  --gold-bg2:rgba(201,168,76,0.07);
+  --azul:#1E90FF;
+  --azul-claro:#4DAAFF;
   --blue:#378ADD;--blue-bg:rgba(55,138,221,0.12);
   --green:#639922;--green-bg:rgba(99,153,34,0.12);
   --amber:#c9a84c;--amber-bg:rgba(201,168,76,0.12);
@@ -199,14 +204,183 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:1px;border
 .rol-btn{width:100%;padding:12px 8px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg3);color:var(--text);cursor:pointer;text-align:center;transition:border-color .15s,background .15s}
 .rol-btn:hover{border-color:var(--gold-dark);background:var(--gold-bg2)}
 .rol-btn.active{border:1.5px solid var(--gold);background:var(--gold-bg);color:var(--gold-light)}
+
+/* ── GOOGLE FONTS ── */
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap');
+
+/* ── FONT OVERRIDE ── */
+body{font-family:'Barlow',sans-serif !important;}
+--font-d:'Barlow Condensed',sans-serif;
+
+/* ── SIDEBAR LAYOUT ── */
+#app-screen{display:flex !important;flex-direction:row;min-height:100vh;}
+
+.sidebar{
+  width:var(--sb-w);
+  min-height:100vh;
+  background:var(--sb-bg);
+  border-right:1px solid var(--border);
+  display:flex;
+  flex-direction:column;
+  position:fixed;
+  left:0;top:0;bottom:0;
+  z-index:50;
+  transition:transform .3s cubic-bezier(.4,0,.2,1);
+}
+.sb-logo-wrap{
+  padding:1.25rem 1rem 1rem;
+  border-bottom:1px solid var(--border);
+  display:flex;justify-content:center;
+}
+.sb-logo-wrap img{
+  width:190px;height:190px;
+  object-fit:contain;
+  filter:drop-shadow(0 0 20px rgba(201,168,76,0.5));
+}
+.sb-nav{flex:1;padding:.75rem 0;overflow-y:auto;}
+.sb-section-label{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:12px;font-weight:700;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--text3);
+  padding:.5rem 1.25rem .25rem;margin-top:.5rem;
+}
+.sb-item{
+  display:flex;align-items:center;gap:10px;
+  padding:.65rem 1.25rem;cursor:pointer;
+  position:relative;transition:all .2s;
+  border:none;background:transparent;
+  width:100%;text-align:left;
+}
+.sb-icon{font-size:16px;width:22px;text-align:center;flex-shrink:0;opacity:.35;transition:opacity .2s;}
+.sb-label{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:16px;font-weight:600;letter-spacing:.03em;
+  color:var(--text3);transition:color .2s;flex:1;
+}
+.sb-item:hover .sb-icon{opacity:.7;}
+.sb-item:hover .sb-label{color:var(--text2);}
+.sb-item:hover{background:rgba(255,255,255,0.025);}
+.sb-item.sb-active{background:linear-gradient(90deg,rgba(201,168,76,0.1),rgba(201,168,76,0.03));}
+.sb-item.sb-active .sb-icon{opacity:1;filter:drop-shadow(0 0 4px var(--gold));}
+.sb-item.sb-active .sb-label{color:var(--gold-light);font-weight:700;}
+.sb-item.sb-active::before{
+  content:'';position:absolute;left:0;top:4px;bottom:4px;
+  width:3px;background:linear-gradient(180deg,var(--gold-light),var(--gold-dark));
+  border-radius:0 2px 2px 0;
+}
+.sb-item.sb-active::after{
+  content:'';position:absolute;right:-1px;top:50%;
+  transform:translateY(-50%);
+  width:0;height:0;
+  border-top:7px solid transparent;
+  border-bottom:7px solid transparent;
+  border-right:7px solid var(--bg2);
+}
+.sb-footer{padding:1rem 1.25rem;border-top:1px solid var(--border);}
+.sb-user-name{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:15px;font-weight:700;color:var(--gold-light);
+  display:block;margin-bottom:2px;
+}
+.sb-user-role{font-size:12px;color:var(--text2);margin-bottom:10px;}
+
+/* ── CONTENT AREA ── */
+.app-content{
+  margin-left:var(--sb-w);
+  flex:1;min-height:100vh;
+  display:flex;flex-direction:column;
+  background:var(--bg);
+}
+
+/* ── CONTENT HEADER ── */
+.content-hdr{
+  padding:1.125rem 2rem;
+  border-bottom:1px solid var(--border);
+  background:rgba(12,15,20,0.95);
+  position:sticky;top:0;z-index:40;
+  backdrop-filter:blur(8px);
+  display:flex;align-items:center;justify-content:space-between;
+  gap:12px;
+}
+.content-hdr-title{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:24px;font-weight:800;letter-spacing:.02em;color:var(--text);
+}
+.content-hdr-sub{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:12px;font-weight:600;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--text3);
+  display:block;margin-bottom:2px;
+}
+
+/* ── MAIN CONTENT ── */
+.content-body{padding:1.5rem 2rem 3rem;}
+
+/* ── HAMBURGER ── */
+.hamburger{
+  display:none;flex-direction:column;gap:5px;
+  cursor:pointer;padding:8px;background:transparent;
+  border:none;z-index:200;
+}
+.hamburger span{display:block;width:22px;height:2px;background:var(--gold);border-radius:2px;}
+.sb-overlay{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,0.6);z-index:49;
+  backdrop-filter:blur(2px);
+}
+.sb-overlay.open{display:block;}
+
+/* ── IMPROVED BUTTONS ── */
+.btn{
+  font-family:'Barlow Condensed',sans-serif !important;
+  font-size:13px !important;font-weight:700 !important;
+  letter-spacing:.08em !important;text-transform:uppercase !important;
+}
+.btn-primary{
+  background:linear-gradient(135deg,var(--gold-light),var(--gold)) !important;
+  color:#0A0800 !important;
+  box-shadow:0 4px 16px rgba(201,168,76,0.3) !important;
+  padding:9px 20px !important;
+}
+.btn-primary:hover{
+  box-shadow:0 6px 24px rgba(201,168,76,0.5) !important;
+  transform:translateY(-2px) !important;
+}
+
+/* ── SECTION LABELS ── */
+.section-label{
+  font-family:'Barlow Condensed',sans-serif !important;
+  font-size:14px !important;font-weight:700 !important;
+  letter-spacing:.08em !important;color:var(--text2) !important;
+}
+
+/* ── METRIC LABELS ── */
+.metric-label,.kpi-label{
+  font-family:'Barlow Condensed',sans-serif !important;
+  font-size:13px !important;font-weight:700 !important;
+  letter-spacing:.06em !important;
+}
+
+/* ── MOBILE ── */
+@media(max-width:768px){
+  .sidebar{transform:translateX(-100%);}
+  .sidebar.open{transform:translateX(0);box-shadow:4px 0 32px rgba(0,0,0,0.5);}
+  .app-content{margin-left:0;}
+  .hamburger{display:flex;}
+  .content-hdr{padding:.875rem 1rem;}
+  .content-body{padding:1rem 1rem 3rem;}
+  .metrics{grid-template-columns:repeat(2,1fr) !important;}
+}
+
 </style>
 </head>
 <body>
 
 <div id="auth-screen" style="display:flex;min-height:100vh;align-items:center;justify-content:center;padding:1rem">
   <div class="auth-card">
-    <div class="auth-logo">industriales.ai</div>
-    <div class="auth-sub">Plataforma de Mapa del Éxito y Money Maker System</div>
+    <div style="text-align:center;margin-bottom:1rem">
+      <img src="logo.png" alt="Money Maker System" style="height:180px;width:auto;filter:drop-shadow(0 0 24px rgba(201,168,76,0.55))">
+    </div>
     <div class="auth-tabs">
       <button class="auth-tab active" onclick="authTab('login')">Iniciar sesión</button>
       <button class="auth-tab" onclick="authTab('signup')">Crear cuenta</button>
@@ -265,37 +439,72 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:1px;border
 </div>
 
 <div id="app-screen" style="display:none">
-  <div class="header-shell">
-    <div class="topbar">
-      <div class="topbar-brand">
-        <div class="topbar-logo">industriales.ai</div>
-        <div class="topbar-sub">Mapa del Éxito &amp; Money Maker System</div>
-      </div>
-      <div class="topbar-user" id="tu"></div>
-      <button class="topbar-out" onclick="signout()">Cerrar sesión</button>
+  <div class="sb-overlay" onclick="closeSidebar()"></div>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sb-logo-wrap">
+      <img src="logo.png" alt="Money Maker System">
     </div>
-    <div class="nav-shell">
-      <div class="nav">
-        <button class="nav-btn active" onclick="go('mapa')">Mapa del Éxito</button>
-        <button class="nav-btn" onclick="go('actividades')">Actividades</button>
-        <button class="nav-btn" onclick="go('scoreboard')">Scoreboard</button>
-        <button class="nav-btn" onclick="go('proyectos')">Oportunidades</button>
-        <button class="nav-btn" onclick="go('seg3x3')">Seguimiento 3x3</button>
-        <button class="nav-btn" onclick="go('ranking')">Ranking</button>
-      </div>
+    <nav class="sb-nav">
+      <div class="sb-section-label">Principal</div>
+      <button class="sb-item sb-active" onclick="go('mapa')">
+        <span class="sb-icon">🗺️</span>
+        <span class="sb-label">Mapa del Éxito</span>
+      </button>
+      <button class="sb-item" onclick="go('actividades')">
+        <span class="sb-icon">⚡</span>
+        <span class="sb-label">Actividades</span>
+      </button>
+      <button class="sb-item" onclick="go('scoreboard')">
+        <span class="sb-icon">🏆</span>
+        <span class="sb-label">Scoreboard</span>
+      </button>
+      <div class="sb-section-label">Gestión</div>
+      <button class="sb-item" onclick="go('proyectos')">
+        <span class="sb-icon">💼</span>
+        <span class="sb-label">Oportunidades</span>
+      </button>
+      <button class="sb-item" onclick="go('seg3x3')">
+        <span class="sb-icon">🔄</span>
+        <span class="sb-label">Seguimiento 3x3</span>
+      </button>
+      <button class="sb-item" onclick="go('ranking')">
+        <span class="sb-icon">📊</span>
+        <span class="sb-label">Ranking</span>
+      </button>
+    </nav>
+    <div class="sb-footer">
+      <span class="sb-user-name" id="sb-nombre"></span>
+      <div class="sb-user-role" id="sb-rol"></div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="signout()">Cerrar sesión</button>
     </div>
-  </div>
-  <div class="main">
-    <div id="page-mapa" class="page active"></div>
-    <div id="page-actividades" class="page"></div>
-    <div id="page-scoreboard" class="page"></div>
-    <div id="page-proyectos" class="page"></div>
-    <div id="page-seg3x3" class="page"></div>
-    <div id="page-ranking" class="page"></div>
-  </div>
-  <div style="text-align:center;padding:1.5rem 0 1rem;font-size:11px;color:var(--text3);letter-spacing:.04em">
-    industriales.ai · v1.0
-  </div>
+  </aside>
+
+  <!-- CONTENT -->
+  <div class="app-content">
+    <div class="content-hdr">
+      <button class="hamburger" onclick="toggleSidebar()">
+        <span></span><span></span><span></span>
+      </button>
+      <div>
+        <span class="content-hdr-sub">Money Maker System</span>
+        <div class="content-hdr-title" id="page-title">Mapa del Éxito</div>
+      </div>
+      <div id="tu" style="font-family:'Barlow Condensed',sans-serif;font-size:14px;color:var(--text2)"></div>
+    </div>
+    <div class="content-body">
+      <div id="page-mapa" class="page active"></div>
+      <div id="page-actividades" class="page"></div>
+      <div id="page-scoreboard" class="page"></div>
+      <div id="page-proyectos" class="page"></div>
+      <div id="page-seg3x3" class="page"></div>
+      <div id="page-ranking" class="page"></div>
+    </div>
+    <div style="text-align:center;padding:1rem 0;font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);border-top:1px solid var(--border)">
+      Money Maker System · industriales.ai · v1.0
+    </div>
+  </div><!-- /app-content -->
 </div>
 
 <script>
@@ -437,6 +646,10 @@ async function iniciarApp(user){
   // Update header with real name
   if(MI_NOMBRE&&MI_ROL){
     document.getElementById('tu').textContent=MI_NOMBRE+' · '+(MI_ROL==='dueno'?'Dueño':'Vendedor');
+  const sbN=document.getElementById('sb-nombre');
+  const sbR=document.getElementById('sb-rol');
+  if(sbN)sbN.textContent=MI_NOMBRE;
+  if(sbR)sbR.textContent=(MI_ROL==='dueno'?'Dueño':'Vendedor')+(ORG?' · '+ORG.nombre:'');
   }
 }
 
@@ -653,12 +866,36 @@ function autoWeek(wk,uid){
   };
 }
 
+const PAGE_TITLES={mapa:'Mapa del Éxito',actividades:'Actividades',scoreboard:'Scoreboard',proyectos:'Oportunidades',seg3x3:'Seguimiento 3x3',ranking:'Ranking'};
+
+function toggleSidebar(){
+  const sb=document.getElementById('sidebar');
+  const ov=document.querySelector('.sb-overlay');
+  if(!sb)return;
+  sb.classList.toggle('open');
+  if(ov)ov.classList.toggle('open');
+  document.body.style.overflow=sb.classList.contains('open')?'hidden':'';
+}
+function closeSidebar(){
+  const sb=document.getElementById('sidebar');
+  const ov=document.querySelector('.sb-overlay');
+  if(sb)sb.classList.remove('open');
+  if(ov)ov.classList.remove('open');
+  document.body.style.overflow='';
+}
 function go(p){
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
-  document.querySelectorAll('.nav-btn').forEach(x=>x.classList.remove('active'));
   document.getElementById('page-'+p).classList.add('active');
-  const idx={mapa:0,actividades:1,scoreboard:2,proyectos:3,seg3x3:4,ranking:5};
-  document.querySelectorAll('.nav-btn')[idx[p]].classList.add('active');
+  // Update sidebar active state
+  document.querySelectorAll('.sb-item').forEach(x=>x.classList.remove('sb-active'));
+  const sbBtns=document.querySelectorAll('.sb-item');
+  const sbIdx={mapa:0,actividades:1,scoreboard:2,proyectos:3,seg3x3:4,ranking:5};
+  if(sbBtns[sbIdx[p]])sbBtns[sbIdx[p]].classList.add('sb-active');
+  // Update page title
+  const titleEl=document.getElementById('page-title');
+  if(titleEl)titleEl.textContent=PAGE_TITLES[p]||p;
+  // Close sidebar on mobile
+  if(window.innerWidth<=768)closeSidebar();
   if(p==='mapa')rMapa();
   if(p==='actividades')rAct();
   if(p==='scoreboard')rSB();
