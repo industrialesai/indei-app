@@ -634,11 +634,10 @@ async function iniciarApp(user){
   // Hide auth immediately, show app
   document.getElementById('auth-screen').style.display='none';
   document.getElementById('app-screen').style.display='block';
-  // Show loading text in mapa area while data loads
-  document.getElementById('page-mapa').innerHTML='<div style="padding:2rem;text-align:center;color:var(--text2);font-size:13px">Cargando datos...</div>';
+  // Show loading state on inicio page
+  document.getElementById('page-inicio').innerHTML='<div style="padding:2rem;text-align:center;color:var(--text2);font-size:13px">Cargando datos...</div>';
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
-  document.getElementById('page-mapa').classList.add('active');
-  document.querySelectorAll('.nav-btn').forEach((x,i)=>{if(i===0)x.classList.add('active');else x.classList.remove('active');});
+  document.getElementById('page-inicio').classList.add('active');
   const meta=user.user_metadata||{};
   document.getElementById('tu').textContent=(meta.full_name||user.email)+' · Cargando...';
   try{
@@ -996,7 +995,7 @@ function rInicio(){
   el.innerHTML=
     // BIENVENIDA
     '<div style="margin-bottom:2rem">'
-    +'<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-bottom:4px">Bienvenido de vuelta</div>'
+    +'<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-bottom:4px">👋 Bienvenido de vuelta</div>'
     +'<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:36px;font-weight:800;color:var(--gold-light);line-height:1;margin-bottom:10px">'+MI_NOMBRE+'</div>'
     +'<div style="font-size:15px;color:var(--text2);font-style:italic;padding:10px 16px;border-left:3px solid var(--gold);background:var(--gold-bg2);border-radius:0 6px 6px 0;max-width:600px">'
     +'"Entre más alimentes este sistema, más cerca estarás de lograr tus metas."'
