@@ -645,8 +645,8 @@ async function iniciarApp(user){
   }catch(e){
     console.error('Error en loadAll:',e);
   }
-  // Always render mapa after loadAll, success or fail
-  try{rMapa();}catch(e){console.error('rMapa error:',e);}
+  // Always render inicio after loadAll
+  try{go('inicio');}catch(e){console.error('rInicio error:',e);}
   // Update header with real name
   if(MI_NOMBRE&&MI_ROL){
     document.getElementById('tu').textContent=MI_NOMBRE+' · '+(MI_ROL==='dueno'?'Dueño':'Vendedor');
@@ -996,7 +996,8 @@ function rInicio(){
     // BIENVENIDA
     '<div style="margin-bottom:2rem">'
     +'<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-bottom:4px">👋 Bienvenido de vuelta</div>'
-    +'<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:36px;font-weight:800;color:var(--gold-light);line-height:1;margin-bottom:10px">'+MI_NOMBRE+'</div>'
+    +'<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:36px;font-weight:800;color:var(--gold-light);line-height:1;margin-bottom:4px">'+MI_NOMBRE+'</div>'
+    +'<div style="font-size:15px;color:var(--text2);margin-bottom:10px;letter-spacing:.02em">'+(ORG?ORG.nombre:'')+'</div>'
     +'<div style="font-size:15px;color:var(--text2);font-style:italic;padding:10px 16px;border-left:3px solid var(--gold);background:var(--gold-bg2);border-radius:0 6px 6px 0;max-width:600px">'
     +'"Entre más alimentes este sistema, más cerca estarás de lograr tus metas."'
     +'</div>'
