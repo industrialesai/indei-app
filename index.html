@@ -1484,7 +1484,8 @@ function rAct(){
   let filt=[...D.act];
   if(fD)filt=filt.filter(a=>a.fecha>=fD);
   if(fH)filt=filt.filter(a=>a.fecha<=fH);
-  if(filtroVendedor!=='todos')filt=filt.filter(a=>a.registrado_por===filtroVendedor);
+  if(MI_ROL!=='dueno')filt=filt.filter(a=>a.registrado_por===ME.id);
+  else if(filtroVendedor!=='todos')filt=filt.filter(a=>a.registrado_por===filtroVendedor);
   const total=filt.length,citas=filt.filter(a=>['cita_agendada','visita_realizada'].includes(a.estado)).length,cots=filt.filter(a=>a.estado==='cotizacion').length,ocs=filt.filter(a=>a.estado==='orden').length;
   const rL=fD&&fH&&fD===fH?fd(fD):fD||fH?`${fD?fd(fD):'inicio'} — ${fH?fd(fH):'hoy'}`:'Todas las fechas';
   const grp={};filt.forEach(a=>{const k=a.fecha||'Sin fecha';if(!grp[k])grp[k]=[];grp[k].push(a);});
@@ -1753,7 +1754,8 @@ function renderProyectos(){
   const f2=forecast.filter(p=>mesKey(p.fecha_cierre)===mes2).reduce((a,p)=>a+(p.valor_estimado||0),0);
   const fMax=Math.max(f0,f1,f2,1);
   let filtrados=proyFiltroEtapa==='todos'?proy:proy.filter(p=>p.etapa===proyFiltroEtapa);
-  if(proyFiltroVendedor!=='todos')filtrados=filtrados.filter(p=>p.creado_por===proyFiltroVendedor);
+  if(MI_ROL!=='dueno')filtrados=filtrados.filter(p=>p.creado_por===ME.id);
+  else if(proyFiltroVendedor!=='todos')filtrados=filtrados.filter(p=>p.creado_por===proyFiltroVendedor);
 
   // Build cards
   let cards='';
@@ -2117,7 +2119,8 @@ async function renderSeg3x3(){
     }
   }
   let segs=[...D.seg];
-  if(segFiltroVendedor!=='todos')segs=segs.filter(s=>s.vendedor_id===segFiltroVendedor);
+  if(MI_ROL!=='dueno')segs=segs.filter(s=>s.vendedor_id===ME.id);
+  else if(segFiltroVendedor!=='todos')segs=segs.filter(s=>s.vendedor_id===segFiltroVendedor);
   const seguActivos=segs.filter(s=>s.estado==='activo');
   const seguCerrados=segs.filter(s=>s.estado==='cerrado');
 
