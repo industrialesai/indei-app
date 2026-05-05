@@ -647,6 +647,9 @@ async function iniciarApp(user){
     await loadAll();
   }catch(e){
     console.error('Error en loadAll:',e);
+    // Show error on screen so user knows what happened
+    document.getElementById('page-inicio').innerHTML='<div style="padding:2rem;text-align:center;color:#e05;font-size:14px">Error al cargar datos: '+e.message+'<br><br><button onclick="location.reload()" style="padding:8px 16px;background:var(--gold);border:none;border-radius:6px;cursor:pointer;font-weight:700">Reintentar</button></div>';
+    return;
   }
   // Always render inicio after loadAll
   try{go('inicio');}catch(e){console.error('rInicio error:',e);}
