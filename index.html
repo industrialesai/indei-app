@@ -441,6 +441,14 @@ body{font-family:'Barlow',sans-serif !important;}
   </div>
 </div>
 
+<div id="org-selector-screen" style="display:none;min-height:100vh;background:var(--bg3);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:1.5rem;padding:2rem">
+  <div style="text-align:center;margin-bottom:.5rem">
+    <img src="logo.png" style="height:120px;filter:drop-shadow(0 0 16px rgba(201,168,76,0.5))">
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--text3);margin-top:8px">Super Admin · Selecciona una organización</div>
+  </div>
+  <div id="org-list" style="width:100%;max-width:480px;display:flex;flex-direction:column;gap:8px"></div>
+</div>
+
 <div id="app-screen" style="display:none">
   <div class="sb-overlay" onclick="closeSidebar()"></div>
 
@@ -498,7 +506,10 @@ body{font-family:'Barlow',sans-serif !important;}
         <span class="content-hdr-sub">Money Maker System</span>
         <div class="content-hdr-title" id="page-title">Mapa del Éxito</div>
       </div>
+      <div style="display:flex;align-items:center;gap:10px">
       <div id="tu" style="font-family:'Barlow Condensed',sans-serif;font-size:14px;color:var(--text2)"></div>
+      <button id="btn-switch-org" onclick="showOrgSelector()" style="display:none;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:5px 12px;background:var(--gold-bg);border:1px solid rgba(201,168,76,0.3);border-radius:var(--radius);color:var(--gold-light);cursor:pointer">⇄ Cambiar org</button>
+    </div>
     </div>
     <div class="content-body">
       <div id="page-inicio" class="page active"></div>
@@ -643,11 +654,22 @@ async function iniciarApp(user){
   document.getElementById('page-inicio').classList.add('active');
   const meta=user.user_metadata||{};
   document.getElementById('tu').textContent=(meta.full_name||user.email)+' · Cargando...';
+  // Check if superadmin
+  IS_SUPERADMIN = await checkSuperadmin();
+  if(IS_SUPERADMIN){
+    ALL_ORGS = await loadAllOrgs();
+    // Show org selector
+    document.getElementById('auth-screen').style.display='none';
+    document.getElementById('app-screen').style.display='none';
+    const btn=document.getElementById('btn-switch-org');
+    if(btn)btn.style.display='inline-flex';
+    showOrgSelector();
+    return;
+  }
   try{
     await loadAll();
   }catch(e){
     console.error('Error en loadAll:',e);
-    // Show error on screen so user knows what happened
     document.getElementById('page-inicio').innerHTML='<div style="padding:2rem;text-align:center;color:#e05;font-size:14px">Error al cargar datos: '+e.message+'<br><br><button onclick="location.reload()" style="padding:8px 16px;background:var(--gold);border:none;border-radius:6px;cursor:pointer;font-weight:700">Reintentar</button></div>';
     return;
   }
@@ -1072,6 +1094,69 @@ function rInicio(){
     +'</div>';
 }
 
+
+
+// ── SUPERADMIN ──
+let IS_SUPERADMIN = false;
+let ALL_ORGS = [];
+let SELECTED_ORG_ID = null;
+
+async function checkSuperadmin(){
+  const{data}=await db.from('miembros').select('rol').eq('user_id',ME.id).maybeSingle();
+  return data&&data.rol==='superadmin';
+}
+
+async function loadAllOrgs(){
+  const{data}=await db.from('organizaciones').select('*').order('nombre');
+  return data||[];
+}
+
+function showOrgSelector(){
+  document.getElementById('app-screen').style.display='none';
+  const screen=document.getElementById('org-selector-screen');
+  screen.style.display='flex';
+  const list=document.getElementById('org-list');
+  list.innerHTML=ALL_ORGS.map(o=>`
+    <button onclick="selectOrg('${o.id}')" style="width:100%;padding:1rem 1.25rem;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);cursor:pointer;text-align:left;transition:all .2s;display:flex;align-items:center;justify-content:space-between;gap:10px"
+      onmouseover="this.style.borderColor='var(--gold)';this.style.background='var(--gold-bg2)'"
+      onmouseout="this.style.borderColor='var(--border)';this.style.background='var(--bg2)'">
+      <div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:700;color:var(--text);text-transform:uppercase">${o.nombre}</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px">${o.id===SELECTED_ORG_ID?'✓ Activa':'Seleccionar'}</div>
+      </div>
+      <span style="font-family:'Barlow Condensed',sans-serif;font-size:22px;color:var(--gold-light)">→</span>
+    </button>
+  `).join('');
+}
+
+async function selectOrg(orgId){
+  SELECTED_ORG_ID=orgId;
+  const org=ALL_ORGS.find(o=>o.id===orgId);
+  ORG=org;
+  document.getElementById('org-selector-screen').style.display='none';
+  document.getElementById('app-screen').style.display='block';
+  load(true);
+  // Load data for selected org
+  const[
+    {data:mems},{data:e},{data:u},{data:a},{data:s},
+    {data:pr},{data:sg}
+  ]=await Promise.all([
+    db.from('miembros').select('*').eq('org_id',orgId),
+    db.from('empresas').select('*').eq('org_id',orgId).order('nombre'),
+    db.from('usuarios').select('*').eq('org_id',orgId).order('created_at'),
+    db.from('actividades').select('*').eq('org_id',orgId).order('fecha',{ascending:false}),
+    db.from('scoreboard').select('*').eq('org_id',orgId),
+    db.from('proyectos').select('*').eq('org_id',orgId).order('created_at',{ascending:false}),
+    db.from('seguimientos').select('*').eq('org_id',orgId).order('created_at',{ascending:false}),
+  ]);
+  MIEMBROS=mems||[];
+  D.emp=e||[];D.usu=u||[];D.act=a||[];D.sb={};D.proy=pr||[];D.proy_com={};D.seg=sg||[];D.seg_con={};
+  s&&s.forEach(r=>{const k=r.week_key+'_'+r.user_id;D.sb[k]=r;});
+  load(false);
+  // Update header
+  document.getElementById('tu').textContent=MI_NOMBRE+' · SuperAdmin · '+org.nombre;
+  go('inicio');
+}
 
 // ── MAPA ──
 function rMapa(){
