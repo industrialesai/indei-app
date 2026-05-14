@@ -895,6 +895,7 @@ function autoWeek(wk,uid){
     cotizaciones:acts.filter(a=>inR(a.fecha)&&a.estado==='cotizacion').length,
     ordenes:acts.filter(a=>inR(a.fecha)&&a.estado==='orden').length,
     knockouts:acts.filter(a=>inR(a.fecha)&&a.estado==='knockout_agregado').length,
+    prospectos:acts.filter(a=>inR(a.fecha)&&a.estado==='prospecto_agregado').length,
   };
 }
 
@@ -1169,8 +1170,8 @@ function rMapa(){
   else D.emp.forEach(emp=>{
     const c=calcEmp(emp.id),pr=prio(c.pep);
     const us=usDeEmp(emp.id);
-    const activeUs=us.filter(u=>!u.es_knockout);
-    const koUs=us.filter(u=>u.es_knockout);
+    const activeUs=us.filter(u=>(u.tipo_usuario||'activo')==='activo');
+    const koUs=us.filter(u=>u.tipo_usuario==='knockout'||u.tipo_usuario==='prospecto');
     const rows=activeUs.map(u=>{const ct=u.fact&&u.pct_rep?u.fact/u.pct_rep:0;return`<tr>
       <td style="font-weight:500">${u.nombre}</td><td>${u.area||'—'}</td>
       <td class="r">${fmt(u.fact)}</td><td class="r">${pf(u.pct_rep)}</td>
@@ -1182,12 +1183,17 @@ function rMapa(){
         <button class="btn btn-sm btn-danger" onclick="delU('${u.id}')">×</button>
       </td>
     </tr>`;}).join('');
-    const koRows=koUs.map(u=>`<tr>
-      <td style="font-weight:500">${u.nombre}<span style="display:inline-block;margin-left:6px;font-size:10px;padding:1px 6px;border-radius:4px;background:var(--gold-bg);color:var(--gold);border:0.5px solid rgba(201,168,76,0.3)">KO</span></td>
+    const koRows=koUs.map(u=>{
+  const tipoLabel=u.tipo_usuario==='prospecto'
+    ?'<span style="display:inline-block;margin-left:5px;font-size:9px;padding:1px 6px;background:rgba(34,197,94,0.1);color:#4ADE80;border:1px solid rgba(34,197,94,0.25);border-radius:3px;font-weight:700">PROS</span>'
+    :'<span style="display:inline-block;margin-left:5px;font-size:9px;padding:1px 6px;background:rgba(30,144,255,0.1);color:#4DAAFF;border:1px solid rgba(30,144,255,0.3);border-radius:3px;font-weight:700">KO</span>';
+  return`<tr>
+      <td style="font-weight:500">${u.nombre}${tipoLabel}</td>
       <td>${u.area||'—'}</td>
       <td>${rcub(u.rcu)}</td>
       <td class="r"><button class="btn btn-sm" onclick="editarKO('${u.id}','${emp.id}')">Actualizar</button> <button class="btn btn-sm btn-danger" onclick="delU('${u.id}')">×</button></td>
-    </tr>`).join('');
+    </tr>`;
+}).join('');
     const tr=us.length?`<tr class="trow"><td>Totales</td><td></td><td class="r">${fmt(c.fT)}</td><td></td><td class="r">${fmt(c.sC)}</td><td class="r" style="color:var(--blue)">${fmt(c.sC-c.fT)}</td><td class="r">${pf(c.sP)}</td><td></td><td></td></tr>`:'';
     ph+=`<div class="card">
       <div class="flex-between" style="margin-bottom:10px">
@@ -1252,6 +1258,45 @@ async function delEmp(id){
   D.emp=D.emp.filter(e=>e.id!==id);D.usu=D.usu.filter(u=>u.empresa_id!==id);D.act=D.act.filter(a=>a.empresa_id!==id);
   load(false);rMapa();
 }
+
+function tipoBadge(u){
+  const t=u.tipo_usuario||'activo';
+  if(t==='knockout') return '<span style="display:inline-block;margin-left:5px;font-size:9px;padding:1px 6px;background:rgba(30,144,255,0.1);color:#4DAAFF;border:1px solid rgba(30,144,255,0.3);border-radius:3px;font-weight:700;letter-spacing:.06em">KO</span>';
+  if(t==='prospecto') return '<span style="display:inline-block;margin-left:5px;font-size:9px;padding:1px 6px;background:rgba(34,197,94,0.1);color:#4ADE80;border:1px solid rgba(34,197,94,0.25);border-radius:3px;font-weight:700;letter-spacing:.06em">PROS</span>';
+  return '';
+}
+function setTipo(eid, tipo){
+  // Update radio
+  const radio=document.getElementById('utipo-'+tipo+'-'+eid);
+  if(radio)radio.checked=true;
+  // Update visual state of buttons
+  ['activo','knockout','prospecto'].forEach(t=>{
+    const btn=document.getElementById('tbtn-'+t+'-'+eid);
+    if(!btn)return;
+    if(t===tipo){
+      const colors={activo:'var(--gold)',knockout:'#1E90FF',prospecto:'var(--verde)'};
+      const bgs={activo:'var(--gold-bg)',knockout:'rgba(30,144,255,0.1)',prospecto:'rgba(34,197,94,0.1)'};
+      btn.style.border='2px solid '+colors[t];
+      btn.style.background=bgs[t];
+      btn.querySelector('div').style.color=t==='activo'?'var(--gold-light)':t==='knockout'?'#4DAAFF':'#4ADE80';
+    } else {
+      btn.style.border='2px solid var(--border2)';
+      btn.style.background='transparent';
+      btn.querySelector('div').style.color='var(--text2)';
+    }
+  });
+  toggleTipoFields(eid);
+}
+
+
+function toggleTipoFields(eid){
+  const tipo=['activo','knockout','prospecto'].find(t=>{
+    const r=document.getElementById('utipo-'+t+'-'+eid);
+    return r&&r.checked;
+  })||'activo';
+  const fields=document.getElementById('ufields-'+eid);
+  if(fields)fields.style.display=(tipo==='knockout'||tipo==='prospecto')?'none':'block';
+}
 function toggleKnockoutFields(eid){
   const isKO=document.getElementById(`uko-${eid}`)?.checked;
   const fields=document.getElementById(`ufields-${eid}`);
@@ -1263,15 +1308,31 @@ function showUF(eid){
   el.innerHTML=`<div style="background:#0a0a0a;border-left:3px solid var(--gold);border-radius:0 var(--radius-lg) var(--radius-lg) 0;padding:1.25rem 1.5rem;margin-bottom:10px">
     <div style="font-size:14px;font-weight:500;color:var(--gold);margin-bottom:14px">Nuevo usuario</div>
 
-    <div style="background:var(--gold-bg);border:0.5px solid rgba(201,168,76,0.25);border-radius:var(--radius);padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between">
-      <div>
-        <div style="font-size:13px;font-weight:500;color:var(--texto)">¿Es un Knockout?</div>
-        <div style="font-size:11px;color:var(--text2);margin-top:2px">Referencia conseguida a través de otro usuario</div>
+    <div style="margin-bottom:14px">
+      <div style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text2);margin-bottom:8px">Tipo de usuario</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+        <label style="cursor:pointer">
+          <input type="radio" name="utipo-${eid}" id="utipo-activo-${eid}" value="activo" checked onchange="toggleTipoFields('${eid}')" style="display:none">
+          <div class="tipo-btn" id="tbtn-activo-${eid}" onclick="setTipo('${eid}','activo')" style="padding:10px 8px;border:2px solid var(--gold);border-radius:var(--radius);text-align:center;background:var(--gold-bg);cursor:pointer">
+            <div style="font-size:13px;font-weight:700;color:var(--gold-light)">✅ Activo</div>
+            <div style="font-size:10px;color:var(--text2);margin-top:2px">Ya factura con nosotros</div>
+          </div>
+        </label>
+        <label style="cursor:pointer">
+          <input type="radio" name="utipo-${eid}" id="utipo-knockout-${eid}" value="knockout" onchange="toggleTipoFields('${eid}')" style="display:none">
+          <div class="tipo-btn" id="tbtn-knockout-${eid}" onclick="setTipo('${eid}','knockout')" style="padding:10px 8px;border:2px solid var(--border2);border-radius:var(--radius);text-align:center;background:transparent;cursor:pointer">
+            <div style="font-size:13px;font-weight:700;color:var(--text2)">🥊 Knockout</div>
+            <div style="font-size:10px;color:var(--text2);margin-top:2px">Referido por otro usuario</div>
+          </div>
+        </label>
+        <label style="cursor:pointer">
+          <input type="radio" name="utipo-${eid}" id="utipo-prospecto-${eid}" value="prospecto" onchange="toggleTipoFields('${eid}')" style="display:none">
+          <div class="tipo-btn" id="tbtn-prospecto-${eid}" onclick="setTipo('${eid}','prospecto')" style="padding:10px 8px;border:2px solid var(--border2);border-radius:var(--radius);text-align:center;background:transparent;cursor:pointer">
+            <div style="font-size:13px;font-weight:700;color:var(--text2)">🎯 Prospecto</div>
+            <div style="font-size:10px;color:var(--text2);margin-top:2px">Prospección propia</div>
+          </div>
+        </label>
       </div>
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:13px;color:var(--texto)">
-        <input type="checkbox" id="uko-${eid}" onchange="toggleKnockoutFields('${eid}')" style="width:18px;height:18px;accent-color:var(--gold);cursor:pointer">
-        Sí, es KO
-      </label>
     </div>
 
     <div class="grid g4">
@@ -1475,11 +1536,15 @@ async function euGuardar(el){
 }
 
 async function saveU(eid){
-  const nombre=document.getElementById(`un-${eid}`)?.value.trim();
+  const nombre=document.getElementById('un-'+eid)?.value.trim();
   if(!nombre)return alert('Escribe el nombre del usuario');
-  const isKO=document.getElementById(`uko-${eid}`)?.checked||false;
-  const area=document.getElementById(`ua-${eid}`)?.value.trim()||'';
-  const rcu=document.getElementById(`ur-${eid}`)?.value||'AMARILLO';
+  const tipoU=['activo','knockout','prospecto'].find(t=>{
+    const r=document.getElementById('utipo-'+t+'-'+eid);
+    return r&&r.checked;
+  })||'activo';
+  const isKO=(tipoU==='knockout'||tipoU==='prospecto');
+  const area=document.getElementById('ua-'+eid)?.value.trim()||'';
+  const rcu=document.getElementById('ur-'+eid)?.value||'AMARILLO';
 
   let fact=0,pct_rep=0,pct_planta=0;
   if(!isKO){
@@ -1501,7 +1566,7 @@ async function saveU(eid){
   const{data,error}=await db.from('usuarios').insert({
     empresa_id:eid,org_id:ORG.id,nombre,area,rcu,
     fact,pct_rep,pct_planta,
-    es_knockout:isKO
+    es_knockout:isKO,tipo_usuario:tipoU
   }).select().single();
   load(false);
   if(error)return alert(error.message);
@@ -1512,8 +1577,8 @@ async function saveU(eid){
   // Registrar actividad automática
   const emp=D.emp.find(e=>e.id===eid);
   if(emp&&data){
-    const estadoAct=isKO?'knockout_agregado':'usuario_agregado';
-    const notasAct=isKO?'Knockout agregado: '+nombre+(area?' ('+area+')':''):'Nuevo usuario registrado: '+nombre+(area?' ('+area+')':'');
+    const estadoAct=tipoU==='knockout'?'knockout_agregado':tipoU==='prospecto'?'prospecto_agregado':'usuario_agregado';
+    const notasAct=tipoU==='knockout'?'Knockout agregado: '+nombre+(area?' ('+area+')':''):tipoU==='prospecto'?'Prospecto agregado: '+nombre+(area?' ('+area+')':''):'Nuevo usuario registrado: '+nombre+(area?' ('+area+')':'');
     const{data:actData}=await db.from('actividades').insert({
       org_id:ORG.id,registrado_por:ME.id,registrado_nombre:MI_NOMBRE,
       empresa_id:eid,usuario_id:data.id,empresa_nombre:emp.nombre,
@@ -1704,11 +1769,9 @@ const AM=[
   {key:'cotizaciones',label:'Cotizaciones',icon:'📄',sub:'por fecha de registro'},
   {key:'ordenes',label:'Órdenes de compra',icon:'✅',sub:'por fecha de registro'},
   {key:'knockouts',label:'Knockouts',icon:'🥊',sub:'usuarios knockout agregados esta semana'},
+  {key:'prospectos',label:'Nuevos prospectos',icon:'🎯',sub:'prospectos por prospección propia'},
 ];
-const MM=[
-  {key:'power_knockouts',label:'Power knockouts',icon:'⚡',sub:'gerentes / supervisores nuevos'},
-  {key:'facturacion',label:'Facturación',icon:'💰',sub:'monto facturado ($)',isMoney:true},
-];
+const MM=[];
 function sbKey2(uid){return wKey()+'_'+(uid||ME.id);}
 function sbG(k,f,uid){const r=D.sb[sbKey2(uid||sbFiltroUid)];if(!r)return'';return r[`${k}_${f}`]||'';}
 async function sbS(k,f,v){
@@ -1783,8 +1846,7 @@ function rSB(){
   ${!isNow?`<div class="info-box">Semana anterior — solo lectura.</div>`:''}
   <div class="sb-div">Indicadores automáticos — de actividades</div>
   <div class="sb-grid">${AM.map(m=>card(m,true)).join('')}</div>
-  <div class="sb-div">Indicadores manuales</div>
-  <div class="sb-grid">${MM.map(m=>card(m,false)).join('')}</div>
+  ${MM.length?`<div class="sb-div">Indicadores manuales</div><div class="sb-grid">${MM.map(m=>card(m,false)).join('')}</div>`:''}
   <div id="sbsum"></div>
   <div style="margin-top:1.5rem"><div class="section-label" style="margin-bottom:10px">Semanas anteriores</div>${hist}</div>`;
   rSBSum();
@@ -1985,10 +2047,10 @@ function pfToggleRazon(){
 }
 function pfUpdUsuarios(){
   const eid=document.getElementById('pf-emp')?.value;
-  const us=D.usu.filter(u=>u.empresa_id===eid&&!u.es_knockout);
+  const us=D.usu.filter(u=>u.empresa_id===eid);
   const sel=document.getElementById('pf-usu');
   if(!sel)return;
-  if(!us.length){sel.innerHTML='<option value="">Sin usuarios activos</option>';return;}
+  if(!us.length){sel.innerHTML='<option value="">Sin usuarios en esta empresa</option>';return;}
   sel.innerHTML=us.map(u=>'<option value="'+u.id+'">'+u.nombre+(u.area?' — '+u.area:'')+'</option>').join('');
 }
 
