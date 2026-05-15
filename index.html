@@ -488,6 +488,10 @@ body{font-family:'Barlow',sans-serif !important;}
         <span class="sb-icon">📊</span>
         <span class="sb-label">Ranking</span>
       </button>
+      <button class="sb-item" onclick="go('reportes')">
+        <span class="sb-icon">📑</span>
+        <span class="sb-label">Reportes</span>
+      </button>
     </nav>
     <div class="sb-footer">
       <span class="sb-user-name" id="sb-nombre"></span>
@@ -519,6 +523,7 @@ body{font-family:'Barlow',sans-serif !important;}
       <div id="page-proyectos" class="page"></div>
       <div id="page-seg3x3" class="page"></div>
       <div id="page-ranking" class="page"></div>
+      <div id="page-reportes" class="page"></div>
     </div>
     <div style="text-align:center;padding:1rem 0;font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);border-top:1px solid var(--border)">
       Money Maker System · industriales.ai · v1.0
@@ -899,7 +904,7 @@ function autoWeek(wk,uid){
   };
 }
 
-const PAGE_TITLES={inicio:'Inicio',mapa:'Mapa del Éxito',actividades:'Actividades',scoreboard:'Scoreboard',proyectos:'Oportunidades',seg3x3:'Seguimiento 3x3',ranking:'Ranking'};
+const PAGE_TITLES={inicio:'Inicio',mapa:'Mapa del Éxito',actividades:'Actividades',scoreboard:'Scoreboard',proyectos:'Oportunidades',seg3x3:'Seguimiento 3x3',ranking:'Ranking',reportes:'Reportes'};
 
 function toggleSidebar(){
   const sb=document.getElementById('sidebar');
@@ -922,7 +927,7 @@ function go(p){
   // Update sidebar active state
   document.querySelectorAll('.sb-item').forEach(x=>x.classList.remove('sb-active'));
   const sbBtns=document.querySelectorAll('.sb-item');
-  const sbIdx={inicio:0,mapa:1,actividades:2,scoreboard:3,proyectos:4,seg3x3:5,ranking:6};
+  const sbIdx={inicio:0,mapa:1,actividades:2,scoreboard:3,proyectos:4,seg3x3:5,ranking:6,reportes:7};
   if(sbBtns[sbIdx[p]])sbBtns[sbIdx[p]].classList.add('sb-active');
   // Update page title
   const titleEl=document.getElementById('page-title');
@@ -1159,6 +1164,194 @@ async function selectOrg(orgId){
   document.getElementById('tu').textContent=MI_NOMBRE+' · SuperAdmin · '+org.nombre;
   go('inicio');
 }
+
+
+// ── REPORTES ──
+function rReportes(){
+  const el=document.getElementById('page-reportes');
+  const hoy=today();
+  // Default: current week Mon-Fri
+  const d=new Date();
+  const day=d.getDay();
+  const diffMon=day===0?-6:1-day;
+  const mon=new Date(d);mon.setDate(d.getDate()+diffMon);
+  const fri=new Date(mon);fri.setDate(mon.getDate()+4);
+  const fmt2=dt=>dt.toISOString().split('T')[0];
+  const defDesde=fmt2(mon),defHasta=fmt2(fri);
+
+  el.innerHTML=`
+  <div style="margin-bottom:1.5rem">
+    <div style="font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text2);margin-bottom:12px">Selecciona el período</div>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:8px">
+        <label style="font-size:13px;color:var(--text2)">Desde:</label>
+        <input type="date" id="rep-desde" value="${defDesde}" style="padding:7px 12px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-size:13px">
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <label style="font-size:13px;color:var(--text2)">Hasta:</label>
+        <input type="date" id="rep-hasta" value="${defHasta}" style="padding:7px 12px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-size:13px">
+      </div>
+      <button class="btn btn-primary" onclick="generarReporte()">Generar reporte</button>
+      <button class="btn btn-s" id="btn-print-rep" style="display:none" onclick="imprimirReporte()">🖨️ Imprimir / PDF</button>
+    </div>
+  </div>
+  <div id="rep-output"></div>`;
+}
+
+function generarReporte(){
+  const desde=document.getElementById('rep-desde')?.value;
+  const hasta=document.getElementById('rep-hasta')?.value;
+  if(!desde||!hasta)return alert('Selecciona el período');
+  if(desde>hasta)return alert('La fecha de inicio no puede ser mayor a la final');
+
+  const inR=dt=>dt&&dt>=desde&&dt<=hasta;
+
+  // Get all vendedores in org
+  const vendedores=MIEMBROS.filter(m=>m.rol==='vendedor'||m.rol==='dueno');
+  if(!vendedores.length){
+    document.getElementById('rep-output').innerHTML='<div style="color:var(--text2);padding:2rem;text-align:center">No hay vendedores registrados.</div>';
+    return;
+  }
+
+  // Build report per vendedor
+  let html=`<div id="reporte-imprimible">`;
+
+  // Header del reporte
+  const fmtDate=dt=>new Date(dt+'T12:00').toLocaleDateString('es-MX',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+  html+=`<div style="margin-bottom:1.5rem;padding:1rem 1.25rem;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+    <div>
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;color:var(--gold-light)">Reporte de Actividades</div>
+      <div style="font-size:13px;color:var(--text2);margin-top:2px">${fmtDate(desde)} — ${fmtDate(hasta)} · ${ORG?ORG.nombre:''}</div>
+    </div>
+    <img src="logo.png" style="height:50px;filter:drop-shadow(0 0 8px rgba(201,168,76,0.4))">
+  </div>`;
+
+  vendedores.forEach(vend=>{
+    const uid=vend.user_id;
+    const nombre=vend.nombre_completo||vend.nombre||uid;
+    const acts=D.act.filter(a=>a.registrado_por===uid&&inR(a.fecha));
+
+    // Scoreboard counts
+    const sb={
+      contactos:acts.filter(a=>['contactado','intento'].includes(a.estado)).length,
+      citas:acts.filter(a=>a.estado==='cita_agendada').length,
+      visitas:acts.filter(a=>a.estado==='visita_realizada').length,
+      cotizaciones:acts.filter(a=>a.estado==='cotizacion').length,
+      ordenes:acts.filter(a=>a.estado==='orden').length,
+      knockouts:acts.filter(a=>a.estado==='knockout_agregado').length,
+      prospectos:acts.filter(a=>a.estado==='prospecto_agregado').length,
+    };
+
+    const total=Object.values(sb).reduce((a,b)=>a+b,0);
+
+    // Estado labels
+    const eLabels={
+      contactado:'Contacto',intento:'Intento de contacto',cita_agendada:'Cita agendada',
+      visita_realizada:'Visita realizada',cotizacion:'Cotización',orden:'Orden',
+      knockout_agregado:'Knockout',prospecto_agregado:'Prospecto',usuario_agregado:'Usuario agregado',
+    };
+
+    // Oportunidades activas para usuarios de este vendedor
+    const opVend=D.proy.filter(p=>p.creado_por===uid&&!['cerrado','perdido'].includes(p.etapa));
+
+    html+=`<div style="margin-bottom:1.5rem;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;page-break-inside:avoid">
+      <!-- Vendedor header -->
+      <div style="padding:.875rem 1.25rem;background:linear-gradient(135deg,var(--bg3),var(--bg2));border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:800;color:var(--gold-light)">${nombre}</div>
+        <div style="font-size:12px;color:var(--text2)">${total} actividad${total!==1?'es':''} en el período</div>
+      </div>
+
+      <!-- Scoreboard mini -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border)">
+        ${[
+          {k:'contactos',i:'📞',l:'Contactos'},
+          {k:'citas',i:'📅',l:'Citas'},
+          {k:'visitas',i:'🏭',l:'Visitas'},
+          {k:'cotizaciones',i:'📋',l:'Cotizaciones'},
+          {k:'ordenes',i:'✅',l:'Órdenes'},
+          {k:'knockouts',i:'🥊',l:'Knockouts'},
+          {k:'prospectos',i:'🎯',l:'Prospectos'},
+        ].map(s=>`<div style="padding:.75rem 1rem;border-right:1px solid var(--border);text-align:center">
+          <div style="font-size:11px;color:var(--text2);margin-bottom:4px">${s.i} ${s.l}</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;color:${sb[s.k]>0?'var(--gold-light)':'var(--text3)'}">${sb[s.k]}</div>
+        </div>`).join('')}
+        <div style="padding:.75rem 1rem;text-align:center">
+          <div style="font-size:11px;color:var(--text2);margin-bottom:4px">📊 Total</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;color:var(--gold-light)">${total}</div>
+        </div>
+      </div>
+
+      <!-- Actividades detalle -->
+      ${acts.length?`
+      <div style="padding:.75rem 1.25rem;border-bottom:1px solid var(--border);font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text3)">Detalle de actividades</div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr style="background:var(--bg3)">
+          <th style="padding:.5rem 1.25rem;text-align:left;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text2);border-bottom:1px solid var(--border)">Fecha</th>
+          <th style="padding:.5rem 1.25rem;text-align:left;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text2);border-bottom:1px solid var(--border)">Empresa</th>
+          <th style="padding:.5rem 1.25rem;text-align:left;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text2);border-bottom:1px solid var(--border)">Usuario</th>
+          <th style="padding:.5rem 1.25rem;text-align:left;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text2);border-bottom:1px solid var(--border)">Actividad</th>
+          <th style="padding:.5rem 1.25rem;text-align:left;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text2);border-bottom:1px solid var(--border)">Notas</th>
+        </tr></thead>
+        <tbody>
+          ${acts.map(a=>`<tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:.5rem 1.25rem;font-size:12px;color:var(--text2)">${fd(a.fecha)}</td>
+            <td style="padding:.5rem 1.25rem;font-size:12px;font-weight:500;color:var(--text)">${a.empresa_nombre||'—'}</td>
+            <td style="padding:.5rem 1.25rem;font-size:12px;color:var(--text2)">${a.usuario_nombre||'—'}</td>
+            <td style="padding:.5rem 1.25rem;font-size:12px;color:var(--text)">${eLabels[a.estado]||a.estado}</td>
+            <td style="padding:.5rem 1.25rem;font-size:12px;color:var(--text2)">${a.notas||'—'}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`
+      :`<div style="padding:1rem 1.25rem;font-size:13px;color:var(--text3);text-align:center">Sin actividades en este período</div>`}
+
+      <!-- Oportunidades activas -->
+      ${opVend.length?`
+      <div style="padding:.75rem 1.25rem;border-top:1px solid var(--border);border-bottom:1px solid var(--border);font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text3)">Oportunidades activas</div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr style="background:var(--bg3)">
+          <th style="padding:.5rem 1.25rem;text-align:left;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text2);border-bottom:1px solid var(--border)">Oportunidad</th>
+          <th style="padding:.5rem 1.25rem;text-align:left;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text2);border-bottom:1px solid var(--border)">Empresa</th>
+          <th style="padding:.5rem 1.25rem;text-align:left;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text2);border-bottom:1px solid var(--border)">Etapa</th>
+          <th style="padding:.5rem 1.25rem;text-align:right;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text2);border-bottom:1px solid var(--border)">Valor</th>
+          <th style="padding:.5rem 1.25rem;text-align:left;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text2);border-bottom:1px solid var(--border)">Cierre estimado</th>
+        </tr></thead>
+        <tbody>
+          ${opVend.map(p=>{const et=ETAPAS_PROY[p.etapa]||ETAPAS_PROY.analisis;return`<tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:.5rem 1.25rem;font-size:12px;font-weight:500;color:var(--text)">${p.nombre}</td>
+            <td style="padding:.5rem 1.25rem;font-size:12px;color:var(--text2)">${p.empresa_nombre||'—'}</td>
+            <td style="padding:.5rem 1.25rem;font-size:12px"><span style="padding:2px 8px;border-radius:3px;background:${et.bg};color:${et.color};font-size:11px;font-weight:700">${et.label}</span></td>
+            <td style="padding:.5rem 1.25rem;font-size:12px;text-align:right;color:var(--gold-light);font-weight:600">${fmt(p.valor_estimado)}</td>
+            <td style="padding:.5rem 1.25rem;font-size:12px;color:var(--text2)">${p.fecha_cierre?fd(p.fecha_cierre):'—'}</td>
+          </tr>`}).join('')}
+        </tbody>
+      </table>`:''}
+    </div>`;
+  });
+
+  html+=`</div>`;
+  document.getElementById('rep-output').innerHTML=html;
+  document.getElementById('btn-print-rep').style.display='inline-flex';
+}
+
+function imprimirReporte(){
+  const el=document.getElementById('reporte-imprimible');
+  if(!el)return;
+  const w=window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html><head>
+    <meta charset="UTF-8">
+    <title>Reporte MMS — ${document.getElementById('rep-desde')?.value||''}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+      *{box-sizing:border-box;margin:0;padding:0}
+      body{font-family:'Barlow',sans-serif;background:#fff;color:#1a1a1a;padding:20px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      @media print{body{padding:0}@page{margin:15mm}}
+      :root{--gold-light:#C9A84C;--text:#1a1a1a;--text2:#5a6272;--text3:#9aa0ad;--bg2:#fff;--bg3:#f5f3ef;--border:rgba(0,0,0,0.1);--radius-lg:8px;--gold-bg2:rgba(201,168,76,0.06)}
+    </style>
+  </head><body>${el.innerHTML}</body></html>`);
+  w.document.close();
+  setTimeout(()=>w.print(),800);
+}
+
 
 // ── MAPA ──
 function rMapa(){
