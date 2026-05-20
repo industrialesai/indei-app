@@ -1368,7 +1368,7 @@ function rMapa(){
     const activeUs=us.filter(u=>(u.tipo_usuario||'activo')==='activo');
     const koUs=us.filter(u=>u.tipo_usuario==='knockout'||u.tipo_usuario==='prospecto');
     const rows=activeUs.map(u=>{const ct=u.fact&&u.pct_rep?u.fact/u.pct_rep:0;return`<tr>
-      <td style="font-weight:500">${u.nombre}</td><td>${u.area||'—'}</td>
+      <td style="font-weight:500">${u.nombre}${u.es_gatekeeper?'<span style="display:inline-block;margin-left:5px;font-size:9px;padding:1px 6px;background:rgba(139,92,246,0.1);color:#A78BFA;border:1px solid rgba(139,92,246,0.25);border-radius:3px;font-weight:700">GK</span>':''}</td><td>${u.area||'—'}</td>
       <td class="r">${fmt(u.fact)}</td><td class="r">${pf(u.pct_rep)}</td>
       <td class="r" style="color:var(--text2)">${fmt(ct)}</td>
       <td class="r" style="color:var(--blue);font-weight:500">${fmt(ct-u.fact)}</td>
@@ -1563,6 +1563,33 @@ function showUF(eid){
       <div class="kpi"><div class="kpi-label">30% DSM</div><div class="kpi-value" style="color:var(--green)" id="u30-${eid}">—</div></div>
     </div>
     </div>
+    <div style="margin-bottom:14px">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 14px;background:var(--gold-bg2);border:1px solid rgba(201,168,76,0.2);border-radius:var(--radius)">
+        <input type="checkbox" id="ugk-${eid}" onchange="toggleGKFields('${eid}')" style="width:18px;height:18px;accent-color:var(--gold);cursor:pointer;flex-shrink:0">
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--texto)">🔒 ¿Es Gatekeeper?</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:1px">Marca si este usuario controla el acceso a otra persona</div>
+        </div>
+      </label>
+      <div id="ugk-fields-${eid}" style="display:none;margin-top:10px;padding:12px 14px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius)">
+        <div style="font-size:11px;color:var(--gold);background:var(--gold-bg2);border:1px solid rgba(201,168,76,0.2);border-radius:var(--radius);padding:7px 10px;margin-bottom:10px">
+          ⚠️ Si el usuario del que es gatekeeper no aparece en la lista, primero debes crearlo.
+        </div>
+        <div class="grid g2">
+          <div>
+            <label>Gatekeeper de (usuario)</label>
+            <select id="ugk-de-${eid}">
+              <option value="">— Selecciona el usuario —</option>
+              ${D.usu.filter(u=>u.empresa_id===eid).map(u=>'<option value="'+u.id+'">'+u.nombre+(u.tipo_usuario==='knockout'?' [KO]':u.tipo_usuario==='prospecto'?' [PROS]':'')+'</option>').join('')}
+            </select>
+          </div>
+          <div>
+            <label>Nota sobre el acceso</label>
+            <input type="text" id="ugk-nota-${eid}" placeholder="Ej: controla agenda de Gerencia">
+          </div>
+        </div>
+      </div>
+    </div>
     <div class="flex-end">
       <button class="btn" onclick="document.getElementById('uform-${eid}').innerHTML=''">Cancelar</button>
       <button class="btn btn-primary" onclick="saveU('${eid}')">Agregar usuario</button>
@@ -1570,6 +1597,12 @@ function showUF(eid){
   </div>`;
 }
 
+
+function toggleGKFields(eid){
+  const checked=document.getElementById('ugk-'+eid)?.checked;
+  const fields=document.getElementById('ugk-fields-'+eid);
+  if(fields)fields.style.display=checked?'block':'none';
+}
 function fmtMoneyInput(el){
   const raw=el.value.replace(/[^0-9]/g,'');
   if(!raw){el.value='';return;}
@@ -1758,10 +1791,14 @@ async function saveU(eid){
   }
 
   load(true);
+  const isGK=document.getElementById('ugk-'+eid)?.checked||false;
+  const gkDeId=isGK?(document.getElementById('ugk-de-'+eid)?.value||null):null;
+  const gkNota=isGK?(document.getElementById('ugk-nota-'+eid)?.value.trim()||null):null;
   const{data,error}=await db.from('usuarios').insert({
     empresa_id:eid,org_id:ORG.id,nombre,area,rcu,
     fact,pct_rep,pct_planta,
-    es_knockout:isKO,tipo_usuario:tipoU
+    es_knockout:isKO,tipo_usuario:tipoU,
+    es_gatekeeper:isGK,gatekeeper_de:gkDeId,gatekeeper_nota:gkNota
   }).select().single();
   load(false);
   if(error)return alert(error.message);
