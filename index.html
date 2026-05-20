@@ -2626,10 +2626,10 @@ function cerrarFormSeg(){const c=document.getElementById('seg-form-container');i
 
 function sfUpdUsu(){
   const eid=document.getElementById('sf-emp')?.value;
-  const us=D.usu.filter(u=>u.empresa_id===eid&&!u.es_knockout);
+  const us=D.usu.filter(u=>u.empresa_id===eid);
   const sel=document.getElementById('sf-usu');
-  if(!us.length){sel.innerHTML='<option value="">Sin usuarios</option>';return;}
-  sel.innerHTML=us.map(u=>'<option value="'+u.id+'">'+u.nombre+'</option>').join('');
+  if(!us.length){sel.innerHTML='<option value="">Sin usuarios en esta empresa</option>';return;}
+  sel.innerHTML=us.map(u=>{const t=u.tipo_usuario||'activo';const tag=t==='knockout'?' [KO]':t==='prospecto'?' [PROS]':'';return'<option value="'+u.id+'">'+u.nombre+tag+'</option>';}).join('');
   sfUpdProy();
 }
 
