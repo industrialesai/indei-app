@@ -1207,8 +1207,10 @@ function generarReporte(){
 
   const inR=dt=>dt&&dt>=desde&&dt<=hasta;
 
-  // Get all vendedores in org
-  const vendedores=MIEMBROS.filter(m=>m.rol==='vendedor'||m.rol==='dueno');
+  // Si es vendedor, solo ve su propio reporte
+  const vendedores=MI_ROL==='dueno'||MI_ROL==='superadmin'
+    ? MIEMBROS.filter(m=>m.rol==='vendedor'||m.rol==='dueno')
+    : MIEMBROS.filter(m=>m.user_id===ME.id);
   if(!vendedores.length){
     document.getElementById('rep-output').innerHTML='<div style="color:var(--text2);padding:2rem;text-align:center">No hay vendedores registrados.</div>';
     return;
