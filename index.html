@@ -2694,9 +2694,18 @@ function sfUpdProy(){
   const uid=document.getElementById('sf-usu')?.value;
   const inf=document.getElementById('sf-proy-info');
   if(!inf)return;
-  const proy=D.proy.find(p=>p.usuario_id===uid&&!['cerrado','perdido'].includes(p.etapa));
-  if(proy)inf.innerHTML='🔗 Proyecto vinculado: <span style="color:var(--gold)">'+proy.nombre+'</span>';
-  else inf.innerHTML='<span style="color:var(--text3)">Sin proyecto activo — se etiquetará "Sin proyecto"</span>';
+  const projs=D.proy.filter(p=>
+    !['cerrado','perdido'].includes(p.etapa)&&
+    (p.usuario_id===uid||p.creado_por===uid)
+  );
+  if(!projs.length){
+    inf.innerHTML='<span style="font-size:12px;color:var(--text3)">Sin oportunidades activas para este usuario</span>';
+    return;
+  }
+  inf.innerHTML='<select id="sf-proy-sel" style="width:100%;padding:7px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-size:13px">'
+    +'<option value="">— Sin oportunidad vinculada —</option>'
+    +projs.map(p=>{const et=ETAPAS_PROY[p.etapa]||ETAPAS_PROY.analisis;return'<option value="'+p.id+'">'+et.icon+' '+p.nombre+' · '+p.empresa_nombre+'</option>';}).join('')
+    +'</select>';
 }
 
 async function saveSeg(){
@@ -2706,7 +2715,8 @@ async function saveSeg(){
   // Permitir múltiples seguimientos por usuario
   const emp=D.emp.find(e=>e.id===eid);
   const usu=D.usu.find(u=>u.id===uid);
-  const proy=D.proy.find(p=>p.usuario_id===uid&&!['cerrado','perdido'].includes(p.etapa));
+  const proySelId=document.getElementById('sf-proy-sel')?.value||null;
+  const proy=proySelId?D.proy.find(p=>p.id===proySelId):null;
   load(true);
   const{data,error}=await db.from('seguimientos').insert({
     org_id:ORG.id,vendedor_id:ME.id,vendedor_nombre:MI_NOMBRE,
