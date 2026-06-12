@@ -1207,10 +1207,28 @@ function generarReporte(){
 
   const inR=dt=>dt&&dt>=desde&&dt<=hasta;
 
-  // Si es vendedor, solo ve su propio reporte
-  const vendedores=MI_ROL==='dueno'||MI_ROL==='superadmin'
-    ? MIEMBROS.filter(m=>m.rol==='vendedor'||m.rol==='dueno')
-    : MIEMBROS.filter(m=>m.user_id===ME.id);
+  // Construir lista de vendedores según rol
+  let vendedores=[];
+  if(MI_ROL==='superadmin'){
+    // SuperAdmin: usar actividades para deducir quiénes registraron en esta org
+    const uidsActivos=[...new Set(D.act.map(a=>a.registrado_por).filter(Boolean))];
+    if(uidsActivos.length){
+      vendedores=uidsActivos.map(uid=>{
+        const act=D.act.find(a=>a.registrado_por===uid);
+        return{user_id:uid,nombre_completo:act?.registrado_nombre||uid,rol:'vendedor'};
+      });
+    } else {
+      // Fallback: usar MIEMBROS si hay
+      vendedores=MIEMBROS.length
+        ? MIEMBROS.filter(m=>m.rol==='vendedor'||m.rol==='dueno')
+        : [{user_id:ME.id,nombre_completo:MI_NOMBRE,rol:'dueno'}];
+    }
+  } else if(MI_ROL==='dueno'){
+    vendedores=MIEMBROS.filter(m=>m.rol==='vendedor'||m.rol==='dueno');
+    if(!vendedores.length) vendedores=[{user_id:ME.id,nombre_completo:MI_NOMBRE,rol:'dueno'}];
+  } else {
+    vendedores=[{user_id:ME.id,nombre_completo:MI_NOMBRE,rol:MI_ROL}];
+  }
   if(!vendedores.length){
     document.getElementById('rep-output').innerHTML='<div style="color:var(--text2);padding:2rem;text-align:center">No hay vendedores registrados.</div>';
     return;
@@ -1231,7 +1249,7 @@ function generarReporte(){
 
   vendedores.forEach(vend=>{
     const uid=vend.user_id;
-    const nombre=vend.nombre_completo||vend.nombre||uid;
+    const nombre=vend.nombre_completo||vend.nombre||vend.registrado_nombre||uid;
     const acts=D.act.filter(a=>a.registrado_por===uid&&inR(a.fecha));
 
     // Scoreboard counts
@@ -2685,8 +2703,7 @@ async function saveSeg(){
   const eid=document.getElementById('sf-emp')?.value;
   const uid=document.getElementById('sf-usu')?.value;
   if(!eid||!uid)return alert('Selecciona empresa y usuario');
-  const existe=D.seg.find(s=>s.usuario_id===uid&&s.estado==='activo');
-  if(existe)return alert('Ya existe un seguimiento activo para este usuario');
+  // Permitir múltiples seguimientos por usuario
   const emp=D.emp.find(e=>e.id===eid);
   const usu=D.usu.find(u=>u.id===uid);
   const proy=D.proy.find(p=>p.usuario_id===uid&&!['cerrado','perdido'].includes(p.etapa));
