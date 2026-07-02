@@ -654,7 +654,7 @@ async function iniciarApp(user){
   document.getElementById('auth-screen').style.display='none';
   document.getElementById('app-screen').style.display='block';
   // Show loading state on inicio page
-  document.getElementById('page-inicio').innerHTML='<div style="padding:2rem;text-align:center;color:var(--text2);font-size:13px">Cargando datos...</div>';
+  document.getElementById('page-inicio').innerHTML='<div style="padding:2rem;text-align:center;color:var(--text2);font-size:13px">Cargando datos...<br><br><button onclick="location.reload()" style="margin-top:8px;padding:6px 14px;background:transparent;border:1px solid var(--border2);border-radius:var(--radius);color:var(--text2);font-size:12px;cursor:pointer">Si tarda mucho, toca aquí</button></div>';
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   document.getElementById('page-inicio').classList.add('active');
   const meta=user.user_metadata||{};
@@ -1992,6 +1992,8 @@ async function saveAct(){
   const eid=document.getElementById('ae')?.value,uid=document.getElementById('au')?.value;
   if(!eid||!uid)return alert('Selecciona empresa y usuario');
   const emp=D.emp.find(e=>e.id===eid),usu=D.usu.find(u=>u.id===uid);
+  if(!emp)return alert('Empresa no encontrada');
+  if(!usu)return alert('Usuario no encontrado — puede haber sido eliminado. Recarga la página.');
   load(true);
   const{data,error}=await db.from('actividades').insert({
     org_id:ORG.id,
