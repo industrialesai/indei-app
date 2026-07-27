@@ -48,6 +48,46 @@ let _radarOrgId=null;
   };
 })();
 
+// ── FIXES DEL NÚCLEO MMS (aplicados en runtime, sin tocar index.html) ──
+(function radarFixesNucleo(){
+  try{
+    // FIX 1: cuelgues intermitentes al refrescar (deadlock documentado de supabase-js).
+    // El listener de onAuthStateChange del núcleo hace `await iniciarApp(...)` DENTRO del callback,
+    // reteniendo el candado interno de auth mientras iniciarApp consulta la base.
+    // Solución oficial: diferir el trabajo fuera del callback. Envolvemos iniciarApp para que
+    // se auto-difiera con setTimeout(0) y regrese de inmediato, liberando el candado.
+    if(typeof iniciarApp==='function'){
+      const _iniciarOrig=iniciarApp;
+      iniciarApp=function(user){
+        setTimeout(()=>{Promise.resolve(_iniciarOrig(user)).catch(e=>console.error('iniciarApp:',e));},0);
+        return Promise.resolve();
+      };
+    }
+    // FIX 2: recordar la organización del superadmin entre refrescos.
+    if(typeof selectOrg==='function'){
+      const _selectOrig=selectOrg;
+      selectOrg=function(orgId){
+        try{localStorage.setItem('mms_sa_org',orgId);}catch(e){}
+        return _selectOrig(orgId);
+      };
+    }
+    if(typeof showOrgSelector==='function'){
+      const _showOrig=showOrgSelector;
+      let _restaurado=false;
+      showOrgSelector=function(){
+        if(!_restaurado){
+          _restaurado=true; // solo auto-restaura en el arranque; el botón "⇄ Cambiar org" sí abre el selector
+          try{
+            const ultima=localStorage.getItem('mms_sa_org');
+            if(ultima&&typeof ALL_ORGS!=='undefined'&&(ALL_ORGS||[]).find(o=>o.id===ultima)){selectOrg(ultima);return;}
+          }catch(e){}
+        }
+        return _showOrig();
+      };
+    }
+  }catch(e){console.error('radarFixesNucleo:',e);}
+})();
+
 // ── CARGA DE DATOS (perezosa, con caché por organización) ──
 async function radarCargarDatos(force){
   if(_radarLoaded&&!force&&_radarOrgId===ORG?.id)return;
