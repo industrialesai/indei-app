@@ -64,6 +64,7 @@ let radarView={mode:'lista',radarId:null};
 let radarFiltroUid='todos';
 let rw=null; // estado del wizard
 const escR=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const RADAR_CANALES={llamada:'📞 Llamada',whatsapp:'💬 WhatsApp',correo:'📧 Correo',reunion:'🤝 Reunión',seguimiento:'🔁 Seguimiento',knockout:'🥊 Knockout™',otro:'📌 Otro'};
 function radarWeekMon(){return wRange(0)[0];}
 function radarMovsDe(rid){return D.radar_mov.filter(m=>m.radar_id===rid).sort((a,b)=>(a.prioridad||1)-(b.prioridad||1));}
 function radarNombreMiembro(uid){const m=MIEMBROS.find(x=>x.user_id===uid);return m?m.nombre:'—';}
@@ -123,6 +124,7 @@ function renderRadar(){
     return;
   }
   if(radarView.mode==='wizard'){el.innerHTML=radarWizardHTML();radarWizardPost();return;}
+  if(radarView.mode==='activado'){el.innerHTML=radarActivadoHTML(radarView.radarId);return;}
   if(radarView.mode==='detalle'){el.innerHTML=radarDetalleHTML(radarView.radarId);return;}
   const wk=radarWeekMon();
   let rads=D.radar;
@@ -189,10 +191,10 @@ function radarCardHTML(r,mini){
 
 // ── WIZARD DE ACTIVACIÓN ──
 function radarNuevo(){
-  rw={paso:1,empresa_id:'',contexto:'',obstaculo:'',movs:[radarMovVacio()]};
+  rw={paso:1,empresa_id:'',contexto:'',porque:'',vision:'',urgencias:'',defensa:'',obstaculo:'',movs:[radarMovVacio()]};
   radarGo('wizard');
 }
-function radarMovVacio(){return{descripcion:'',usuario_id:'',proyecto_id:'',responsable_id:ME.id,fecha:'',hora:'',prioridad:1};}
+function radarMovVacio(){return{descripcion:'',usuario_id:'',proyecto_id:'',responsable_id:ME.id,fecha:'',hora:'',prioridad:1,canal:'',hoy:false};}
 function radarWizardHTML(){
   const wk=radarWeekMon();
   const pasos=['CUENTA','MAPA DE PODER™','SIGUIENTE MOVIMIENTO','BLINDAJE™'];
@@ -230,10 +232,18 @@ function radarPaso1HTML(){
       <option value="">— Selecciona la cuenta —</option>${opts}</select>
     ${aviso}
     <div style="margin-top:14px">
-      <label style="display:block;font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">¿Cómo está esta cuenta hoy? (contexto rápido)</label>
+      <label style="display:block;font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">1. ¿Por qué elegiste esta cuenta?</label>
+      <textarea id="rw-porque" rows="2" style="width:100%;padding:8px 10px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg3);color:var(--text);resize:vertical" placeholder="Ej. Ya nos compran refacciones, tienen 3 líneas nuevas arrancando y el presupuesto 2026 se define en agosto...">${escR(rw.porque)}</textarea>
+    </div>
+    <div style="margin-top:12px">
+      <label style="display:block;font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">2. ¿Qué oportunidad visualizas dentro de esta cuenta? (hasta 3)</label>
+      <textarea id="rw-vision" rows="3" style="width:100%;padding:8px 10px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg3);color:var(--text);resize:vertical" placeholder="1. Contrato anual de mantenimiento&#10;2. Equipar la línea 4&#10;3. Entrar con el área de calidad">${escR(rw.vision)}</textarea>
+    </div>
+    <div style="margin-top:12px">
+      <label style="display:block;font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">¿Cómo está esta cuenta hoy? (contexto rápido, opcional)</label>
       <textarea id="rw-contexto" rows="2" style="width:100%;padding:8px 10px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg3);color:var(--text);resize:vertical" placeholder="Ej. Tenemos 2 oportunidades cotizadas, el ingeniero de calidad no responde desde hace 3 semanas...">${escR(rw.contexto)}</textarea>
     </div>
-    <div style="margin-top:14px;text-align:right"><button class="btn btn-primary"${puedeAvanzar?'':' disabled style="opacity:.4;cursor:not-allowed"'} onclick="rw.contexto=document.getElementById('rw-contexto').value;rw.paso=2;renderRadar()">Siguiente: Mapa de Poder™ →</button></div>
+    <div style="margin-top:14px;text-align:right"><button class="btn btn-primary"${puedeAvanzar?'':' disabled style="opacity:.4;cursor:not-allowed"'} onclick="radarLeerPaso1();rw.paso=2;renderRadar()">Siguiente: Mapa de Poder™ →</button></div>
   </div>`;
 }
 function radarPaso2HTML(){
@@ -275,9 +285,12 @@ function radarPaso3HTML(){
         <select id="rm-usu-${i}" style="width:100%;padding:7px;font-size:12px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg2);color:var(--text)"><option value="">—</option>${us.map(u=>`<option value="${u.id}"${m.usuario_id===u.id?' selected':''}>${escR(u.nombre)}</option>`).join('')}</select></div>
       <div><label style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em">Oportunidad (opcional)</label>
         <select id="rm-proy-${i}" style="width:100%;padding:7px;font-size:12px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg2);color:var(--text)"><option value="">—</option>${proys.map(p=>`<option value="${p.id}"${m.proyecto_id===p.id?' selected':''}>${escR(p.nombre)}</option>`).join('')}</select></div>
+      <div><label style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em">Canal</label>
+        <select id="rm-canal-${i}" style="width:100%;padding:7px;font-size:12px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg2);color:var(--text)"><option value="">—</option>${Object.entries(RADAR_CANALES).map(([k,v])=>`<option value="${k}"${m.canal===k?' selected':''}>${v}</option>`).join('')}</select></div>
       <div><label style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em">Prioridad</label>
         <select id="rm-prio-${i}" style="width:100%;padding:7px;font-size:12px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg2);color:var(--text)">${[1,2,3,4,5].map(p=>`<option value="${p}"${(m.prioridad||1)===p?' selected':''}>${p}</option>`).join('')}</select></div>
     </div>
+    <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13px;cursor:pointer;color:var(--gold-light)"><input type="checkbox" id="rm-hoy-${i}"${m.hoy?' checked':''} style="accent-color:var(--gold)"> ⚡ Puedo ejecutarlo HOY mismo (Regla de Acción™: si puede hacerse hoy, se hace hoy)</label>
     <div style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--border2)">
       <div style="font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--gold-light);margin-bottom:6px">🛡️ BLINDAJE™ — responsable + fecha + hora + registro en MMS</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px">
@@ -297,6 +310,10 @@ function radarPaso3HTML(){
     ${radarSenalesHTML(sen)}
     <div id="rw-senales-seg"><div style="font-size:12px;color:var(--text3)">Cargando seguimientos 3x3…</div></div>
   </div>
+  ${prevCerrado&&prevCerrado.siguiente_movimiento?`<div class="card" style="border-color:rgba(201,168,76,0.35)">
+    <div style="font-weight:700;margin-bottom:6px">➡️ Al cerrar tu radar anterior declaraste este siguiente movimiento:</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px"><span>${escR(prevCerrado.siguiente_movimiento)}</span><button class="btn btn-s" onclick="radarUsarSiguiente('${prevCerrado.id}')">＋ Usarlo</button></div>
+  </div>`:''}
   ${pendPrev.length?`<div class="card" style="border-color:rgba(201,168,76,0.35)">
     <div style="font-weight:700;margin-bottom:6px">↩️ Movimientos no ejecutados de tu radar anterior</div>
     ${pendPrev.map(m=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px"><span>${escR(m.descripcion)}</span><button class="btn btn-s" onclick="radarRetomarMov('${m.id}')">＋ Retomar</button></div>`).join('')}
@@ -306,9 +323,14 @@ function radarPaso3HTML(){
     <div style="font-size:13px;color:var(--text2);margin-bottom:12px">Define de 1 a 5 movimientos para esta semana. Sin blindaje (responsable, fecha, hora) el movimiento no existe. Al activar el radar, cada movimiento se registra automáticamente como actividad en el MMS.</div>
     ${movRows}
     ${rw.movs.length<5?`<button class="btn btn-s" onclick="radarLeerFormTodos();rw.movs.push(radarMovVacio());renderRadar()">＋ Agregar movimiento</button>`:''}
-    <div style="margin-top:14px">
-      <label style="display:block;font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">🧱 ¿Qué obstáculo debes eliminar? ¿Qué necesitas de tu director para avanzar? (opcional)</label>
-      <textarea id="rw-obst" rows="2" style="width:100%;padding:8px 10px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg3);color:var(--text);resize:vertical" placeholder="Ej. Necesito que el área técnica me acompañe a la visita del miércoles">${escR(rw.obstaculo)}</textarea>
+    <div style="margin-top:16px;padding:12px;background:var(--bg3);border:1px dashed var(--border2);border-radius:var(--radius)">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--gold-light);margin-bottom:8px">🛡️ IDENTIFICA LOS OBSTÁCULOS — protege tu plan del secuestro operativo</div>
+      <label style="display:block;font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">¿Qué urgencias normalmente te secuestran?</label>
+      <textarea id="rw-urgencias" rows="1" style="width:100%;padding:7px 10px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg2);color:var(--text);resize:vertical;margin-bottom:8px" placeholder="Ej. Reclamos de entrega, cotizaciones exprés, juntas de operación...">${escR(rw.urgencias)}</textarea>
+      <label style="display:block;font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">¿Qué harás cuando aparezcan?</label>
+      <textarea id="rw-defensa" rows="1" style="width:100%;padding:7px 10px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg2);color:var(--text);resize:vertical;margin-bottom:8px" placeholder="Ej. Bloquear martes y jueves de 8 a 10 am solo para movimientos RADAR; delegar reclamos a Luis...">${escR(rw.defensa)}</textarea>
+      <label style="display:block;font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">🧱 ¿Qué necesitas de tu director para avanzar? (se verá en Gobierno Comercial)</label>
+      <textarea id="rw-obst" rows="1" style="width:100%;padding:7px 10px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg2);color:var(--text);resize:vertical" placeholder="Ej. Necesito que el área técnica me acompañe a la visita del miércoles">${escR(rw.obstaculo)}</textarea>
     </div>
     <div style="margin-top:14px;display:flex;justify-content:space-between">
       <button class="btn btn-s" onclick="radarLeerFormTodos();rw.paso=2;renderRadar()">← Atrás</button>
@@ -324,6 +346,12 @@ function radarWizardPost(){
     });
   }
 }
+function radarLeerPaso1(){
+  const g=id=>document.getElementById(id);
+  if(g('rw-porque'))rw.porque=g('rw-porque').value;
+  if(g('rw-vision'))rw.vision=g('rw-vision').value;
+  if(g('rw-contexto'))rw.contexto=g('rw-contexto').value;
+}
 function radarLeerForm(i){
   const g=id=>document.getElementById(id);
   const m=rw.movs[i];if(!m)return;
@@ -334,17 +362,31 @@ function radarLeerForm(i){
   if(g('rm-resp-'+i))m.responsable_id=g('rm-resp-'+i).value;
   if(g('rm-fecha-'+i))m.fecha=g('rm-fecha-'+i).value;
   if(g('rm-hora-'+i))m.hora=g('rm-hora-'+i).value;
+  if(g('rm-canal-'+i))m.canal=g('rm-canal-'+i).value;
+  if(g('rm-hoy-'+i))m.hoy=g('rm-hoy-'+i).checked;
 }
 function radarLeerFormTodos(){
   rw.movs.forEach((_,i)=>radarLeerForm(i));
-  const ob=document.getElementById('rw-obst');if(ob)rw.obstaculo=ob.value;
+  const g=id=>document.getElementById(id);
+  if(g('rw-obst'))rw.obstaculo=g('rw-obst').value;
+  if(g('rw-urgencias'))rw.urgencias=g('rw-urgencias').value;
+  if(g('rw-defensa'))rw.defensa=g('rw-defensa').value;
+}
+function radarUsarSiguiente(rid){
+  radarLeerFormTodos();
+  const prev=D.radar.find(x=>x.id===rid);
+  if(!prev||!prev.siguiente_movimiento)return;
+  if(rw.movs.length===1&&!rw.movs[0].descripcion)rw.movs=[];
+  if(rw.movs.length>=5)return alert('Máximo 5 movimientos por radar.');
+  rw.movs.push({descripcion:prev.siguiente_movimiento,usuario_id:'',proyecto_id:'',responsable_id:ME.id,fecha:'',hora:'',prioridad:1,canal:'',hoy:false});
+  renderRadar();
 }
 function radarRetomarMov(mid){
   radarLeerFormTodos();
   const m=D.radar_mov.find(x=>x.id===mid);if(!m)return;
   if(rw.movs.length===1&&!rw.movs[0].descripcion)rw.movs=[];
   if(rw.movs.length>=5)return alert('Máximo 5 movimientos por radar.');
-  rw.movs.push({descripcion:m.descripcion,usuario_id:m.usuario_id||'',proyecto_id:m.proyecto_id||'',responsable_id:m.responsable_id||ME.id,fecha:'',hora:'',prioridad:m.prioridad||1});
+  rw.movs.push({descripcion:m.descripcion,usuario_id:m.usuario_id||'',proyecto_id:m.proyecto_id||'',responsable_id:m.responsable_id||ME.id,fecha:'',hora:'',prioridad:m.prioridad||1,canal:m.canal||'',hoy:false});
   renderRadar();
 }
 async function radarActivar(){
@@ -360,7 +402,9 @@ async function radarActivar(){
   const{data:rad,error}=await db.from('radares').insert({
     org_id:ORG.id,empresa_id:emp.id,empresa_nombre:emp.nombre,
     user_id:ME.id,vendedor_nombre:MI_NOMBRE,week_key:radarWeekMon(),
-    contexto:rw.contexto||null,obstaculo:rw.obstaculo||null,estado:'activo'
+    contexto:rw.contexto||null,obstaculo:rw.obstaculo||null,
+    porque:rw.porque||null,oportunidad_vision:rw.vision||null,
+    urgencias:rw.urgencias||null,plan_defensa:rw.defensa||null,estado:'activo'
   }).select().single();
   if(error){load(false);return alert('Error al crear el radar: '+error.message);}
   D.radar.unshift(rad);
@@ -373,7 +417,8 @@ async function radarActivar(){
       usuario_id:m.usuario_id||null,usuario_nombre:usu?.nombre||null,
       proyecto_id:m.proyecto_id||null,proyecto_nombre:proy?.nombre||null,
       responsable_id:m.responsable_id,responsable_nombre:radarNombreMiembro(m.responsable_id),
-      fecha_compromiso:m.fecha,hora:m.hora||null,prioridad:m.prioridad||1,estado:'pendiente'
+      fecha_compromiso:m.fecha,hora:m.hora||null,prioridad:m.prioridad||1,
+      canal:m.canal||null,ejecutar_hoy:!!m.hoy,estado:'pendiente'
     }).select().single();
     if(e1){console.error(e1);continue;}
     // 2) Registro automático en MMS (Paso 5 — Registro™)
@@ -383,7 +428,7 @@ async function radarActivar(){
         empresa_id:emp.id,empresa_nombre:emp.nombre,
         usuario_id:m.usuario_id||null,usuario_nombre:usu?.nombre||'—',
         estado:'movimiento_radar',fecha:today(),fecha_prog:m.fecha,
-        notas:'🎯 RADAR: '+m.descripcion.trim()+(m.hora?' ('+m.hora+')':'')
+        notas:'🎯 RADAR'+(m.canal&&RADAR_CANALES[m.canal]?' · '+RADAR_CANALES[m.canal]:'')+': '+m.descripcion.trim()+(m.hora?' ('+m.hora+')':'')+(m.hoy?' ⚡HOY':'')
       }).select().single();
       if(act){
         D.act.unshift(act);
@@ -394,14 +439,43 @@ async function radarActivar(){
     D.radar_mov.push(mov);
   }
   load(false);
-  radarGo('detalle',rad.id);
+  radarGo('activado',rad.id);
+}
+
+// ── PANTALLA: RADAR ACTIVADO™ 🚀 ──
+function radarActivadoHTML(rid){
+  const r=D.radar.find(x=>x.id===rid);
+  const movs=radarMovsDe(rid);
+  const hoyN=movs.filter(m=>m.ejecutar_hoy).length;
+  const checks=['Cuenta definida','Mapa de Poder revisado','Contactos identificados','Siguientes movimientos definidos ('+movs.length+')','Blindaje completado','Registro realizado en MMS — automático ✓',hoyN?'Acción inmediata: '+hoyN+' movimiento'+(hoyN>1?'s':'')+' para HOY ⚡':'Acción programada en agenda','Reporte: se completa el viernes al cerrar'];
+  return`<div style="max-width:640px;margin:0 auto;text-align:center">
+    <div class="card" style="border-color:rgba(201,168,76,0.5);background:var(--gold-bg2);padding:2rem 1.5rem">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:34px;font-weight:800;color:var(--gold-light);letter-spacing:.04em">RADAR ACTIVADO™ 🚀</div>
+      <div style="font-size:14px;color:var(--text2);margin-top:4px">${escR(r?.empresa_nombre||'')} · Semana ${r?wLabel(r.week_key):''}</div>
+      <div style="text-align:left;margin:1.5rem auto 0;max-width:420px">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-bottom:8px">Tablero RADAR™</div>
+        ${checks.map(c=>`<div style="display:flex;gap:8px;align-items:flex-start;font-size:13px;padding:4px 0;color:var(--text)"><span style="color:var(--green)">✅</span> ${c}</div>`).join('')}
+      </div>
+      <div style="margin:1.5rem auto 0;max-width:420px;text-align:left;padding:14px;background:var(--bg2);border-radius:var(--radius);border:0.5px solid var(--border2)">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-bottom:8px">Declaración RADAR™</div>
+        <div style="font-size:13px;line-height:1.7;color:var(--text)">
+          <b>No voy a esperar oportunidades.</b> Voy a provocarlas.<br>
+          <b>No voy a depender de la suerte.</b> Voy a depender de un sistema.<br>
+          <b>No voy a permitir que la operación secuestre mi crecimiento.</b><br>
+          Voy a regresar al ataque. Voy a ejecutar. Voy a crecer.<br>
+          <span style="color:var(--gold-light);font-weight:700">Voy a darle machín. 🥊</span>
+        </div>
+      </div>
+      <button class="btn btn-primary" style="margin-top:1.5rem;font-size:15px;padding:10px 28px" onclick="radarGo('detalle','${rid}')">Ir a mis movimientos →</button>
+    </div>
+  </div>`;
 }
 
 // ── DETALLE / EJECUCIÓN / CIERRE ──
 function radarDetalleHTML(rid){
   const r=D.radar.find(x=>x.id===rid);
   if(!r)return'<div class="empty">Radar no encontrado.</div>';
-  const movs=radarMovsDe(rid);
+  const movs=radarMovsDe(rid).sort((a,b)=>((b.ejecutar_hoy&&b.estado==='pendiente')?1:0)-((a.ejecutar_hoy&&a.estado==='pendiente')?1:0));
   const ej=movs.filter(m=>m.estado==='ejecutado').length;
   const noEj=movs.filter(m=>m.estado==='no_ejecutado').length;
   const pend=movs.length-ej-noEj;
@@ -415,9 +489,9 @@ function radarDetalleHTML(rid){
     return`<div class="card" style="background:var(--bg3);margin-bottom:8px">
       <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap">
         <div style="flex:1;min-width:200px">
-          <div style="font-size:14px"><span style="color:var(--gold-light);font-weight:700">P${m.prioridad||1}</span> · ${escR(m.descripcion)}</div>
+          <div style="font-size:14px">${m.ejecutar_hoy&&m.estado==='pendiente'?'<span style="font-size:10px;padding:1px 7px;background:var(--gold);color:#111;border-radius:3px;font-weight:800;letter-spacing:.04em;margin-right:6px;vertical-align:middle">⚡ HOY</span>':''}<span style="color:var(--gold-light);font-weight:700">P${m.prioridad||1}</span> · ${escR(m.descripcion)}</div>
           <div style="font-size:12px;color:var(--text2);margin-top:4px">
-            🛡️ ${escR(m.responsable_nombre||radarNombreMiembro(m.responsable_id))} · 📅 ${fd(m.fecha_compromiso)}${m.hora?' '+m.hora.slice(0,5):''}
+            ${m.canal&&RADAR_CANALES[m.canal]?RADAR_CANALES[m.canal]+' · ':''}🛡️ ${escR(m.responsable_nombre||radarNombreMiembro(m.responsable_id))} · 📅 ${fd(m.fecha_compromiso)}${m.hora?' '+m.hora.slice(0,5):''}
             ${m.usuario_nombre?' · 👤 '+escR(m.usuario_nombre):''}${m.proyecto_nombre?' · 💼 '+escR(m.proyecto_nombre):''}
             ${m.actividad_id?' · <span style="color:var(--gold-light)">registrado en MMS ✓</span>':''}
           </div>
@@ -437,12 +511,16 @@ function radarDetalleHTML(rid){
     ?`<div class="card" style="border-color:rgba(99,153,34,0.35)">
         <div style="font-weight:700;color:var(--green);margin-bottom:6px">✅ Revisión de Ejecución™ completada (${pct}% de cumplimiento)</div>
         ${r.aprendizaje?`<div style="font-size:13px;color:var(--text)"><b>¿Qué aprendimos / qué ajustamos?</b><br>${escR(r.aprendizaje)}</div>`:''}
+        ${r.siguiente_movimiento?`<div style="font-size:13px;color:var(--text);margin-top:8px"><b>➡️ Siguiente movimiento:</b> ${escR(r.siguiente_movimiento)}</div>`:''}
         ${esMio?`<button class="btn btn-primary" style="margin-top:10px" onclick="radarNuevoDesde('${r.empresa_id}')">🎯 Activar nuevo radar en esta cuenta</button>`:''}
       </div>`
     :esMio?`<div class="card">
         <div style="font-weight:700;margin-bottom:4px">PASO 7 — Cerrar radar · Revisión de Ejecución™</div>
         <div style="font-size:13px;color:var(--text2);margin-bottom:10px">Responde las tres preguntas: ¿qué ejecutamos? (arriba) · ¿qué aprendimos? · ¿qué vamos a ajustar? ${pend>0?`<br><span style="color:var(--red)">Aún tienes ${pend} movimiento${pend>1?'s':''} pendiente${pend>1?'s':''} por marcar.</span>`:''}</div>
-        <textarea id="rd-aprendizaje" rows="3" style="width:100%;padding:8px 10px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg3);color:var(--text);resize:vertical" placeholder="¿Qué aprendimos esta semana? ¿Qué vamos a ajustar para la siguiente?">${escR(r.aprendizaje||'')}</textarea>
+        <label style="display:block;font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">¿Qué aprendimos? ¿Qué vamos a ajustar?</label>
+        <textarea id="rd-aprendizaje" rows="2" style="width:100%;padding:8px 10px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg3);color:var(--text);resize:vertical" placeholder="Ej. Las visitas en martes funcionan mejor; el contacto clave es el jefe de mantenimiento, no compras...">${escR(r.aprendizaje||'')}</textarea>
+        <label style="display:block;font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 3px">¿Cuál es el siguiente movimiento? (arranque del próximo radar)</label>
+        <textarea id="rd-siguiente" rows="2" style="width:100%;padding:8px 10px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg3);color:var(--text);resize:vertical" placeholder="Ej. Presentar la propuesta del contrato anual al gerente de planta">${escR(r.siguiente_movimiento||'')}</textarea>
         <div style="margin-top:10px;text-align:right"><button class="btn btn-primary"${pend>0?' disabled style="opacity:.4;cursor:not-allowed"':''} onclick="radarCerrar('${r.id}')">Cerrar radar</button></div>
       </div>`:'';
   return`<div style="max-width:860px">
@@ -453,13 +531,20 @@ function radarDetalleHTML(rid){
     <div class="card">
       <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800">🎯 ${escR(r.empresa_nombre)}</div>
       <div style="font-size:13px;color:var(--text2)">${escR(radarNombreMiembro(r.user_id))} · Semana ${wLabel(r.week_key)}</div>
-      ${r.contexto?`<div style="font-size:13px;margin-top:8px;color:var(--text2)"><b style="color:var(--text)">Contexto:</b> ${escR(r.contexto)}</div>`:''}
+      ${r.porque?`<div style="font-size:13px;margin-top:8px;color:var(--text2)"><b style="color:var(--text)">¿Por qué esta cuenta?</b> ${escR(r.porque)}</div>`:''}
+      ${r.oportunidad_vision?`<div style="font-size:13px;margin-top:6px;color:var(--text2);white-space:pre-line"><b style="color:var(--text)">Oportunidad que visualizo:</b> ${escR(r.oportunidad_vision)}</div>`:''}
+      ${r.contexto?`<div style="font-size:13px;margin-top:6px;color:var(--text2)"><b style="color:var(--text)">Contexto:</b> ${escR(r.contexto)}</div>`:''}
+      ${r.urgencias||r.plan_defensa?`<div style="margin-top:8px;font-size:12px;padding:8px 10px;background:var(--bg2);border:1px dashed var(--border2);border-radius:var(--radius);color:var(--text2)">🛡️ <b style="color:var(--text)">Plan de defensa:</b> ${r.urgencias?'Me secuestran: '+escR(r.urgencias)+'. ':''}${r.plan_defensa?'Cuando aparezcan: '+escR(r.plan_defensa):''}</div>`:''}
       ${r.obstaculo?`<div style="margin-top:8px;font-size:13px;padding:8px 10px;background:var(--amber-bg);border-radius:var(--radius)">🧱 <b>Obstáculo / necesito de mi director:</b> ${escR(r.obstaculo)}</div>`:''}
       <div style="margin-top:12px;display:flex;gap:14px;font-size:13px;flex-wrap:wrap">
         <span style="color:var(--green)">✅ ${ej} ejecutados</span><span style="color:var(--red)">❌ ${noEj} no ejecutados</span><span style="color:var(--text2)">⏳ ${pend} pendientes</span><span style="color:var(--gold-light);font-weight:700">${pct}% cumplimiento</span>
       </div>
       <div style="margin-top:8px;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden"><div style="height:100%;width:${pct}%;background:var(--gold)"></div></div>
     </div>
+    ${!cerrado&&movs.some(m=>m.ejecutar_hoy&&m.estado==='pendiente')?`<div class="card" style="border-color:rgba(201,168,76,0.5);background:var(--gold-bg2);margin-top:14px">
+      <div style="font-weight:800;color:var(--gold-light)">⚡ ACCIÓN INMEDIATA — el momento de la verdad</div>
+      <div style="font-size:13px;color:var(--text2);margin-top:4px">Regla de Acción™: si puede hacerse hoy, se hace hoy. Ningún movimiento se queda sin dueño, sin fecha ni sin ejecución. Tienes ${movs.filter(m=>m.ejecutar_hoy&&m.estado==='pendiente').length} movimiento${movs.filter(m=>m.ejecutar_hoy&&m.estado==='pendiente').length>1?'s':''} marcado${movs.filter(m=>m.ejecutar_hoy&&m.estado==='pendiente').length>1?'s':''} para HOY — están destacados abajo.</div>
+    </div>`:''}
     <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--text2);margin:14px 0 8px">Paso 6 — Acción™ · Movimientos de la semana</div>
     ${movHTML||'<div class="empty">Sin movimientos.</div>'}
     ${cierreHTML}
@@ -483,16 +568,17 @@ async function radarCerrar(rid){
   const movs=radarMovsDe(rid);
   if(movs.some(m=>m.estado==='pendiente'))return alert('Marca todos los movimientos como ejecutados o no ejecutados antes de cerrar.');
   const ap=document.getElementById('rd-aprendizaje')?.value.trim();
+  const sig=document.getElementById('rd-siguiente')?.value.trim()||null;
   if(!ap)return alert('La Revisión de Ejecución™ requiere responder: ¿qué aprendimos y qué vamos a ajustar?');
   load(true);
-  const{error}=await db.from('radares').update({estado:'cerrado',aprendizaje:ap,cerrado_at:new Date().toISOString()}).eq('id',rid);
+  const{error}=await db.from('radares').update({estado:'cerrado',aprendizaje:ap,siguiente_movimiento:sig,cerrado_at:new Date().toISOString()}).eq('id',rid);
   load(false);
   if(error)return alert(error.message);
-  r.estado='cerrado';r.aprendizaje=ap;r.cerrado_at=new Date().toISOString();
+  r.estado='cerrado';r.aprendizaje=ap;r.siguiente_movimiento=sig;r.cerrado_at=new Date().toISOString();
   renderRadar();
 }
 function radarNuevoDesde(eid){
-  rw={paso:1,empresa_id:eid,contexto:'',obstaculo:'',movs:[radarMovVacio()]};
+  rw={paso:1,empresa_id:eid,contexto:'',porque:'',vision:'',urgencias:'',defensa:'',obstaculo:'',movs:[radarMovVacio()]};
   radarGo('wizard');
 }
 // ══════════════════════════════════════════════
