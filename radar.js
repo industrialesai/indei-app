@@ -185,6 +185,7 @@ function radarCardHTML(r,mini){
       <span>⏳ ${movs.length-ej-noEj} pendiente${movs.length-ej-noEj!==1?'s':''}</span>
     </div>
     <div style="margin-top:8px;height:5px;background:var(--bg3);border-radius:3px;overflow:hidden"><div style="height:100%;width:${pct}%;background:var(--gold);transition:width .3s"></div></div>
+    ${movs.length?`<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">${movs.map(m=>`<div style="font-size:12px;padding:3px 0;color:var(--text2);line-height:1.5">${m.estado==='ejecutado'?'✅':m.estado==='no_ejecutado'?'❌':(m.ejecutar_hoy?'⚡':'⏳')} <span style="color:var(--text)">${escR(m.descripcion)}</span>${m.canal&&RADAR_CANALES[m.canal]?' · '+RADAR_CANALES[m.canal]:''}${m.usuario_nombre?' · 👤 '+escR(m.usuario_nombre):''}${m.fecha_compromiso?' · 📅 '+fd(m.fecha_compromiso):''}${m.hora?' '+String(m.hora).slice(0,5):''}</div>`).join('')}</div>`:''}
     ${r.obstaculo?`<div style="margin-top:8px;font-size:12px;padding:6px 10px;background:var(--amber-bg);border-radius:var(--radius);color:var(--text)">🧱 <b>Obstáculo:</b> ${escR(r.obstaculo)}</div>`:''}
   </div>`;
 }
@@ -197,8 +198,8 @@ function radarNuevo(){
 function radarMovVacio(){return{descripcion:'',usuario_id:'',proyecto_id:'',responsable_id:ME.id,fecha:'',hora:'',prioridad:1,canal:'',hoy:false};}
 function radarWizardHTML(){
   const wk=radarWeekMon();
-  const pasos=['CUENTA','MAPA DE PODER™','SIGUIENTE MOVIMIENTO','BLINDAJE™'];
-  const stepper=`<div style="display:flex;gap:4px;margin-bottom:1rem;flex-wrap:wrap">${pasos.map((p,i)=>`<div style="flex:1;min-width:110px;text-align:center;padding:7px 4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;letter-spacing:.06em;border-radius:var(--radius);${rw.paso===i+1?'background:var(--gold-bg);color:var(--gold-light);border:1px solid rgba(201,168,76,0.4);font-weight:700':'background:var(--bg3);color:var(--text3);border:1px solid var(--border)'}">PASO ${i+1}<br>${p}</div>`).join('')}</div>`;
+  const pasos=[{n:'PASO 1',t:'CUENTA™'},{n:'PASO 2',t:'MAPA DE PODER™'},{n:'PASOS 3 Y 4',t:'MOVIMIENTOS + BLINDAJE™'}];
+  const stepper=`<div style="display:flex;gap:4px;margin-bottom:1rem;flex-wrap:wrap">${pasos.map((p,i)=>`<div style="flex:1;min-width:130px;text-align:center;padding:7px 4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;letter-spacing:.06em;border-radius:var(--radius);${rw.paso===i+1?'background:var(--gold-bg);color:var(--gold-light);border:1px solid rgba(201,168,76,0.4);font-weight:700':'background:var(--bg3);color:var(--text3);border:1px solid var(--border)'}">${p.n}<br>${p.t}</div>`).join('')}</div>`;
   let cuerpo='';
   if(rw.paso===1)cuerpo=radarPaso1HTML();
   if(rw.paso===2)cuerpo=radarPaso2HTML();
@@ -531,6 +532,7 @@ function radarDetalleHTML(rid){
     <div class="card">
       <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800">🎯 ${escR(r.empresa_nombre)}</div>
       <div style="font-size:13px;color:var(--text2)">${escR(radarNombreMiembro(r.user_id))} · Semana ${wLabel(r.week_key)}</div>
+      ${(()=>{const cts=[...new Set(movs.filter(m=>m.usuario_nombre).map(m=>m.usuario_nombre))];return cts.length?`<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center"><span style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em">Contactos en esta jugada:</span>${cts.map(c=>`<span style="padding:3px 10px;background:var(--bg3);border:1px solid var(--border2);border-radius:12px;font-size:12px">👤 ${escR(c)}</span>`).join('')}</div>`:''})()}
       ${r.porque?`<div style="font-size:13px;margin-top:8px;color:var(--text2)"><b style="color:var(--text)">¿Por qué esta cuenta?</b> ${escR(r.porque)}</div>`:''}
       ${r.oportunidad_vision?`<div style="font-size:13px;margin-top:6px;color:var(--text2);white-space:pre-line"><b style="color:var(--text)">Oportunidad que visualizo:</b> ${escR(r.oportunidad_vision)}</div>`:''}
       ${r.contexto?`<div style="font-size:13px;margin-top:6px;color:var(--text2)"><b style="color:var(--text)">Contexto:</b> ${escR(r.contexto)}</div>`:''}
