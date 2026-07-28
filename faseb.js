@@ -76,4 +76,6 @@ function fbAgendaRender(){
 function fbIrRadar(rid){go('radar');radarGo('detalle',rid);}
 async function fbEjecutar(mid){await radarMarcarMov(mid,'ejecutado');fbAgendaRender();}
 console.log('✅ Fase B (agenda de hoy + forecast honesto) cargada');
+// ── Cargar siguiente módulo de la cadena ──
+(function(){const s=document.createElement('script');s.src='fasec.js';s.onerror=()=>console.warn('Módulo no encontrado: fasec.js');document.body.appendChild(s);})();
 // ══════════════════════════════════════════════
