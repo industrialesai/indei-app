@@ -624,3 +624,14 @@ function radarNuevoDesde(eid){
   radarGo('wizard');
 }
 // ══════════════════════════════════════════════
+
+// ── CARGADOR DE MÓDULOS DE EXTENSIÓN ──
+// Cada fase nueva del MMS vive en su propio archivo; se agregan aquí sin tocar index.html.
+(function(){
+  ['mapa2.js'].forEach(src=>{
+    const s=document.createElement('script');
+    s.src=src;
+    s.onerror=()=>console.warn('Módulo de extensión no encontrado:',src);
+    document.body.appendChild(s);
+  });
+})();
