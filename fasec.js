@@ -96,4 +96,6 @@ euGuardar=async function(el){
   }
 };
 console.log('✅ Fase C (archivado + renombrado en cascada) cargada');
+// ── Cargar siguiente módulo de la cadena ──
+(function(){const s=document.createElement('script');s.src='gobierno.js';s.onerror=()=>console.warn('Módulo no encontrado: gobierno.js');document.body.appendChild(s);})();
 // ══════════════════════════════════════════════
