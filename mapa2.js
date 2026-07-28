@@ -318,4 +318,6 @@ if(typeof radarPaso2HTML==='function'){
   };
 }
 console.log('✅ Mapa del Éxito v2 cargado');
+// ── Cargar siguiente módulo de la cadena ──
+(function(){const s=document.createElement('script');s.src='faseb.js';s.onerror=()=>console.warn('Módulo no encontrado: faseb.js');document.body.appendChild(s);})();
 // ══════════════════════════════════════════════
